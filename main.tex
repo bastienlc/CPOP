@@ -3,7 +3,7 @@
 \usepackage{shortcuts}
 % Document parameters
 % Document title
-\title{Mini-Project (ML for Time Series) - MVA 2023/2024}
+\title{Detecting Changes in Slope With an $L_0$ Penalty}
 \author{
 Bastien LE CHENADEC \email{bastien.le-chenadec@eleves.enpc.fr} \\ % student 1
 Sofiane EZZEHI \email{sofiane.ezzehi@eleves.enpc.fr} % student 2
@@ -56,6 +56,48 @@ The Introduction section (indicative length : less than 1 page) should detail th
 
 The Method section (indicative length : 1 to 2 pages) should describe the mathematical aspects of the method in a summarized manner. Only the main steps that are useful for understanding should be highlighted. If relevant, some details on implementation can be provided (but only marginally).
 
+A word on notations : if we have a sequence $x=x_1,\dots,x_n$, we denote $x[s:t]$ the subsequence $x_s,\dots,x_t$.
+
+\subsection{Model}
+
+Let $y=y_1, \dots, y_n$ be successive data points in time. The goal of this method is to find $m$ changepoints $\tau_1,\dots,\tau_m$ such that the data is divided in $m+1$ segments. We let $\tau_0=0$ and $\tau_{m+1}=n$; the segment $j$ is then $y_{\tau_{j-1}+1},\dots,y_{\tau_j}$.
+
+The method considers a piecewise linear model to fit the data. We denote $\phi_{\tau_j}$ the value taken by the model at time $\tau_j$. Under these assumptions, the model writes :
+\begin{equation}
+    \forall 0\leq i\leq m,\,\forall \tau_i+1\leq t\leq \tau_{i+1},\quad Y_t=\phi_{\tau_i}+\frac{\phi_{\tau_{i+1}}-\phi_{\tau_i}}{\tau_{i+1}-\tau_i}(t-\tau_i)+Z_t
+\end{equation}
+where $(Z_t)_{1\leq t\leq n}$ is assumed to be a gaussian white noise with variance $\sigma^2$.
+
+\subsection{Penalized cost approach}
+
+The method uses a penalized cost approach to find the changepoints. The cost function is a squarred error loss, penalized by a term that depends on the segments length, and an $L_0$ penalty on the number of changepoints. The cost function naturally writes :
+\begin{equation}
+    \sum_{i=0}^m \left[\frac{1}{\sigma^2}\sum_{t=\tau_i+1}^{\tau_{i+1}} \left(y_t-\phi_{\tau_i}-\frac{\phi_{\tau_{i+1}}-\phi_{\tau_i}}{\tau_{i+1}-\tau_i}(t-\tau_i)\right)^2 + h(\tau_{i+1}-\tau_i)\right]+\beta m
+\end{equation}
+By introducing a segment cost, for fitting a segment that takes the value $\phi$ at time $s$ and $\psi$ at time $t$, on the data $y_{s+1},\dots,y_t$, that writes :
+\begin{equation}
+    \mathcal{C}(y[s+1:t],\phi,\psi) = \frac{1}{\sigma^2}\sum_{j=s+1}^t \left(y_j-\phi-\frac{\psi-\phi}{t-s}(j-s)\right)^2
+\end{equation}
+
+the penalized cost function can be rewritten as :
+\begin{equation}
+    \label{eq:problem}
+    \min_{\substack{m\\\tau_1,\dots,\tau_m\\ \phi_0,\dots,\phi_{m+1}}} \beta m+\sum_{i=0}^m \mathcal{C}(y[\tau_i+1:\tau_{i+1}],\phi_{\tau_i},\phi_{\tau_{i+1}}) + h(\tau_{i+1}-\tau_i)
+\end{equation}
+
+\subsection{Dynamic programming}
+
+We want to solve the problem \eqref{eq:problem} by dynamic programming. Compared to other changepoints detection methods, the difficulty lies in the continuity constraint between segments. Thus the authors introduce $f^t(\phi)$ as the minimum cost for segmenting $y_1,\dots,y_t$ in $k+1$ segments conditionally on the model taking the value $\phi$ at time $t$ :
+\begin{equation}
+    \begin{aligned}
+        f^t(\phi)=\min_{\substack{\tau_1,\dots,\tau_{k}                         \\ \phi_0,\dots,\phi_k}} &\sum_{i=0}^{k-1} \mathcal{C}(y[\tau_i+1:\tau_{i+1}],\phi_{\tau_i},\phi_{\tau_{i+1}}) + h(\tau_{i+1}-\tau_i)\\
+         & +\mathcal{C}(y[\tau_k+1:t],\phi_{\tau_k},\phi)+h(t-\tau_k) + \beta k
+    \end{aligned}
+\end{equation}
+which they are able to express recursively :
+\begin{equation}
+    f^t(\phi)=\min_{\phi',s} f^s(\phi')+\mathcal{C}(y[s+1:t],\phi',\phi)+h(t-s)+\beta
+\end{equation}
 
 
 \section{Data}
