@@ -99,6 +99,34 @@ which they are able to express recursively :
     f^t(\phi)=\min_{\phi',s} f^s(\phi')+\mathcal{C}(y[s+1:t],\phi',\phi)+h(t-s)+\beta
 \end{equation}
 
+They also introduce $f^t_{\boldsymbol{\tau}}(\phi)$ which is the minimum cost for segmenting $y_1,\dots,y_t$ in $k+1$ segments conditionally on the model taking the value $\phi$ at time $t$ and the changepoints being $\boldsymbol{\tau}=(\tau_0,\tau_1,\dots,\tau_k,\tau_{k+1})$. This quantity is a quadratic polynomial in $\phi$ and the authors are able to express its coefficients recursively. All of this allows them to compute $f^n(\phi)$ in $\mathcal{O}(n!/(n-m)!)$.
+
+\subsection{Pruning}
+
+Given the high complexity of the dynamic programming algorithm (exploring the space of all possible changepoints), the authors introduce multiple pruning techniques to reduce the complexity.
+
+\paragraph*{Functional pruning} The authors introduce $\mathcal{T}_t$ the set of all possible changepoint vectors at time $t$, and $\mathcal{T}_t^*=\left\{\boldsymbol{\tau}\in \mathcal{T}_t \:\big|\: \exists\phi\in\mathbb{R}, f^t(\phi)=f_{\boldsymbol{\tau}}^t(\phi)\right\}$ the set of changepoint vectors at time $t$ that are optimal for some $\phi$.
+
+\begin{theorem}
+    \label{th:functional_pruning}
+    Let $\boldsymbol{\tau}\in\mathcal{T}_s$ such that $\boldsymbol{\tau}\notin \mathcal{T}_s^*$. Then $\boldsymbol{\tau}\notin \mathcal{T}_t^*$ for all $t>s$.
+\end{theorem}
+
+This theorem allows us to only explore $\hat{\mathcal{T}}_t=\left\{(\boldsymbol{\tau},s)\:\big|\: 0\leq s\leq t-1, \boldsymbol{\tau}\in \mathcal{T}_s^*\right\}$ when computing $f^t(\phi)$.
+
+\paragraph*{Inequality based pruning} Let $K=2\beta+h(1)+h(n)$. Suppose that $h$ is non-negative and non-decreasing.
+
+\begin{theorem}
+    Let $\tau\in\mathcal{T}_s$ such that :
+    $$\min_\phi f_{\boldsymbol{\tau}}^s(\phi) > K + \min_{\phi'} f^s(\phi')$$
+    Then $\boldsymbol{\tau}\notin \mathcal{T}_t^*$ for all $t>s$.
+\end{theorem}
+
+This theorem allows to further prune the set $\hat{\mathcal{T}}_t$.
+
+\subsection{Algorithm}
+
+
 
 \section{Data}
 The Data section (indicative length : 1 page) should provide a deep analysis of the data used for experiment. In particular, we are interested here in your capacity to provide relevant and thoughtful feedbacks on the data and to demonstrate that you master some "data diagnosis" tools that have been dealt with in the lectures/tutorials.
