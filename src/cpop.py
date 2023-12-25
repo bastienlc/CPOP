@@ -7,9 +7,12 @@ from .c_optimality_intervals import (
 )
 from .optimality_intervals import get_optimality_intervals
 from .update_coefficients import update_coefficients
-from .utils import SegmentingCostCoefficientsStore, get_values
-
-linear_segment_cost = lambda i: i
+from .utils import (
+    SegmentingCostCoefficientsStore,
+    get_values,
+    linear_segment_cost,
+    precompute_sums,
+)
 
 
 def CPOP(
@@ -27,9 +30,7 @@ def CPOP(
     f.set([], 0, np.array([-beta, 0, 0]))
 
     K = 2 * beta + h(1) + h(n)
-    y_cumsum = np.cumsum(y)
-    y_linear_cumsum = np.cumsum(y * np.arange(1, n + 1))
-    y_squarred_cumsum = np.cumsum(y**2)
+    y_cumsum, y_linear_cumsum, y_squarred_cumsum = precompute_sums(y)
 
     for t in range(1, n):
         for tau in tau_hat:

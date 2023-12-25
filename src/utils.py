@@ -83,3 +83,18 @@ def get_values(
         )
     else:
         return np.inf * np.sign(coefficients[:, 2])
+
+
+def linear_segment_cost(seg_len: int) -> float:
+    return seg_len
+
+
+def precompute_sums(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    y_cumsum = np.zeros((len(y) + 1))
+    y_cumsum[:-1] = np.cumsum(y)
+    y_linear_cumsum = np.zeros((len(y) + 1))
+    y_linear_cumsum[:-1] = np.cumsum(y * np.arange(1, len(y) + 1))
+    y_squarred_cumsum = np.zeros((len(y) + 1))
+    y_squarred_cumsum[:-1] = np.cumsum(y**2)
+    return y_cumsum, y_linear_cumsum, y_squarred_cumsum
+

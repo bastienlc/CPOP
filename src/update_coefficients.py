@@ -29,10 +29,15 @@ def update_coefficients(
     C = (
         -2
         / (seg_len * sigma**2)
-        * (y_linear_cumsum[t] - y_linear_cumsum[s] - s * y_cumsum[t] + s * y_cumsum[s])
+        * (
+            y_linear_cumsum[t - 1]
+            - y_linear_cumsum[s - 1]
+            - s * y_cumsum[t - 1]
+            + s * y_cumsum[s - 1]
+        )
     )
-    D = 1 / sigma**2 * (y_squarred_cumsum[t] - y_squarred_cumsum[s])
-    E = -C - 2 / sigma**2 * (y_cumsum[t] - y_cumsum[s])
+    D = 1 / sigma**2 * (y_squarred_cumsum[t - 1] - y_squarred_cumsum[s - 1])
+    E = -C - 2 / sigma**2 * (y_cumsum[t - 1] - y_cumsum[s - 1])
     F = (seg_len - 1) * (2 * seg_len - 1) / (6 * seg_len * sigma**2)
 
     previous_coefficients = f.get(tau[:-1], tau[-1])
