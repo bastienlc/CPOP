@@ -2,14 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ruptures import Dynp, Pelt
 
-from cpop import CPOP
+from src import CPOP
 
-n = 40
-sigma = 1
+n = 100
+sigma = 0.1
 
 # create a pice-wise linear signal
-phis = [0, 10, 0]
-taus = [0, n // 2, n]
+phis = [0, 50, 25, 100]
+taus = [0, n // 3, 2 * n // 3, n]
 
 signal = np.zeros(n)
 for i in range(len(taus) - 1):
@@ -21,7 +21,9 @@ for i in range(len(taus) - 1):
 signal += np.random.normal(loc=0, scale=sigma, size=n)
 
 
-changepoints_cpop = CPOP(signal, 10 * np.log(n), sigma=sigma, verbose=True)
+changepoints_cpop = CPOP(
+    signal, 10 * np.log(n), sigma=sigma, verbose=True, use_cython=True
+)
 changepoints_dynp = Dynp(model="clinear").fit_predict(signal, n_bkps=len(phis))
 changepoints_pelt = Pelt(model="clinear").fit_predict(signal, pen=400)
 
