@@ -11,9 +11,24 @@ class SegmentingCostCoefficientsStore:
     def __init__(self):
         self.dictionary = {}
 
-    def _get_key(self, tau: List[int], t: int):
-        key = str(t) + "|" + ",".join(map(str, tau))
+    def _get_tau_key(self, tau: List[int]) -> str:
+        key = ",".join(map(str, tau))
         return key
+
+    def _get_t_key(self, t: int) -> str:
+        return str(t)
+
+    def _get_key(self, tau: List[int], t: int):
+        key = self._get_t_key(t) + "|" + self._get_tau_key(tau)
+        return key
+
+    def _get_tau_and_t(self, key: str) -> Tuple[List[int], int]:
+        tau = key.split("|")[1].split(",")
+        if tau == [""]:
+            tau = []
+        tau = [int(x) for x in tau]
+        t = int(key.split("|")[0])
+        return tau, t
 
     def get(self, tau: List[int], t: int) -> np.ndarray:
         try:
@@ -35,18 +50,22 @@ class SegmentingCostCoefficientsStore:
             )
         return values
 
-    def get_time(self, t: int) -> np.ndarray:
-        keys = [key for key in self.dictionary.keys() if key.split("|")[0] == str(t)]
-        values = np.zeros((len(keys), 3))
-        taus = []
-        for i, key in enumerate(keys):
-            values[i, :] = self.dictionary[key]
-            tau = key.split("|")[1].split(",")
-            taus.append([int(x) for x in tau])
-        return values, taus
-
     def set(self, tau: List[int], t: int, value: np.ndarray) -> None:
         self.dictionary[self._get_key(tau, t)] = value
+
+    def clean(self, current_tau_hat: List[List[int]], current_t: int) -> None:
+        keys = self.dictionary.keys()
+        keys_to_delete = []
+        current_tau_hat = [self._get_tau_key(tau) for tau in current_tau_hat]
+
+        for key in keys:
+            tau, t = self._get_tau_and_t(key)
+            if t < current_t and self._get_tau_key(tau + [t]) not in current_tau_hat:
+                keys_to_delete.append(key)
+
+        self.dictionary = {
+            k: self.dictionary[k] for k in keys if k not in keys_to_delete
+        }
 
 
 def CPOP(
@@ -81,6 +100,9 @@ def CPOP(
         # Finish functional pruning
         if t < n - 1:  # We don't need to do this at the last iteration
             tau_hat += new_taus
+
+        # Clean the store
+        f.clean(tau_hat, t)
 
         if verbose:
             print(f"Iterations {t}/{n} : {len(tau_hat)} taus stored", end="\r")
