@@ -194,11 +194,16 @@ def get_optimality_intervals(
             else:
                 coefficients = f.get(tau_hat[tau], t) - f.get(tau_hat[current_tau], t)
                 # Solve for the roots
-                roots = np.roots(coefficients[::-1])
-                # Keep the real roots
-                roots = roots[np.isreal(roots)].real
+                delta = coefficients[1] ** 2 - 4 * coefficients[2] * coefficients[0]
+                if delta < 0:
+                    tau_temp.remove(tau)
+                    x_taus.append(np.inf)
+                    continue
+                else:
+                    root1 = -coefficients[1] + np.sqrt(delta) / 2 / coefficients[2]
+                    root2 = -coefficients[1] - np.sqrt(delta) / 2 / coefficients[2]
                 # Only keep roots larger than the current phi
-                roots = roots[roots > current_phi]
+                roots = [root for root in [root1, root2] if root > current_phi]
                 if len(roots) == 0:
                     tau_temp.remove(tau)
                     x_taus.append(np.inf)
