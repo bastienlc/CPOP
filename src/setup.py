@@ -6,6 +6,6 @@ ext_modules = [
     Extension("c_optimality_intervals", sources=["optimality_intervals.pyx"])
 ]
 setup(
-    ext_modules=cythonize(ext_modules, gdb_debug=True),
+    ext_modules=cythonize(ext_modules),
     include_dirs=[numpy.get_include()],
 )

@@ -10,35 +10,44 @@ ctypedef List[List[int]] TauHatType
 ctypedef List[List[Tuple[float, float]]] OptimalityIntervalsType
 ctypedef np.float np_float
 
-@boundscheck(False)
-@wraparound(False)
-cpdef np.ndarray[np_float, ndim=1] c_get_values(
-    TauHatType tau_hat,
-    np.ndarray[np_float, ndim=2] segmenting_cost_coefficients,
-    float phi,
-):
-    if not np.isinf(phi):  # Return the value of each polynomial at phi
-        return (
-            segmenting_cost_coefficients[:, 0]
-            + segmenting_cost_coefficients[:, 1] * phi
-            + segmenting_cost_coefficients[:, 2] * phi**2
-        )
-    else:
-        return np.inf * np.sign(segmenting_cost_coefficients[:, 2])
+EPS = 1e-6
 
 @boundscheck(False)
 @wraparound(False)
 cpdef OptimalityIntervalsType get_optimality_intervals(
-        TauHatType tau_hat, np.ndarray[np_float, ndim=2] segmenting_cost_coefficients, int t):
-    """Returns the intervals on which each tau in tau_hat is the optimal tau"""
+        TauHatType tau_hat,
+        np.ndarray[np_float, ndim=2] segmenting_cost_coefficients,
+        int t,
+        np.ndarray[np_float, ndim=1] minus_inf_values
+    ):
+    r"""Computes the intervals of :math:`\phi` on which each tau in tau_hat is the optimal tau. In the paper this corresponds to :math:`Int_{\tau}^{t}`. This algorithm is the one proposed in the paper.
+
+    Parameters
+    ----------
+    tau_hat : TauHatType
+        The segmentations for which we want to compute the optimality intervals.
+    segmenting_cost_coefficients : np.ndarray[np_float, ndim=2]
+        The coefficients of the optimal cost for all the segmentations in tau_hat.
+    t : int
+        The current time.
+    minus_inf_values : np.ndarray[np_float, ndim=1]
+        The optimal costs evaluated for phi=-inf for all segmentations in tau_hat.
+
+    Returns
+    -------
+    List[List[Tuple[float, float]]]
+        The optimality intervals for each segmentation in tau_hat.
+    """
+
+    # If there is only one segmentation, it is optimal on the whole interval
     if len(tau_hat) == 1:
         return [[(-np.inf, np.inf)]]
 
-    # Let's use the indices of tau_hat to keep track of the taus that are still in the set
+    # We use the indices of tau_hat to keep track of the taus that are still in the set
     cdef list[int] tau_temp_indices = list(range(len(tau_hat)))
     cdef OptimalityIntervalsType optimality_intervals = [[] for _ in range(len(tau_hat))]
     cdef float current_phi = -np.inf
-    cdef int current_tau_index = np.argmin(c_get_values(tau_hat, segmenting_cost_coefficients, current_phi))
+    cdef int current_tau_index = np.argmin(minus_inf_values)
     cdef np.ndarray[np_float, ndim=1] x_taus
     cdef int new_tau
     cdef float new_phi
@@ -66,11 +75,11 @@ cpdef OptimalityIntervalsType get_optimality_intervals(
                     root2 = -coefficients[1] - sqrt(delta) / 2 / coefficients[2]
 
                     # Only keep roots larger than the current phi
-                    if root1 > current_phi and root2 > current_phi:
+                    if root1 > current_phi + EPS and root2 > current_phi + EPS:
                         x_taus[i] = fmin(root1, root2)
-                    elif root1 > current_phi:
+                    elif root1 > current_phi + EPS:
                         x_taus[i] = root1
-                    elif root2 > current_phi:
+                    elif root2 > current_phi + EPS:
                         x_taus[i] = root2
                     else:
                         indices_to_remove.append(tau_index)

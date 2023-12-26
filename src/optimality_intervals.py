@@ -5,6 +5,8 @@ import numpy as np
 
 from .utils import SegmentingCostCoefficientsStore, compute_costs
 
+EPS = 1e-6
+
 
 def get_optimality_intervals(
     tau_hat: List[List[int]], f: SegmentingCostCoefficientsStore, t: int
@@ -59,11 +61,11 @@ def get_optimality_intervals(
                     root2 = -coefficients[1] - sqrt(delta) / 2 / coefficients[2]
 
                     # Only keep roots larger than the current phi
-                    if root1 > current_phi and root2 > current_phi:
+                    if root1 > current_phi + EPS and root2 > current_phi + EPS:
                         x_taus[i] = min(root1, root2)
-                    elif root1 > current_phi:
+                    elif root1 > current_phi + EPS:
                         x_taus[i] = root1
-                    elif root2 > current_phi:
+                    elif root2 > current_phi + EPS:
                         x_taus[i] = root2
                     else:
                         indices_to_remove.append(tau_index)

@@ -56,7 +56,7 @@ def CPOP(
     if use_cython:
         try:
             from .c_optimality_intervals import (
-                optimality_intervals as c_get_optimality_intervals,
+                get_optimality_intervals as c_get_optimality_intervals,
             )
         except ImportError:
             print(
@@ -101,8 +101,9 @@ def CPOP(
         # For each tau in tau_hat, compute the intervals of phi on which tau is the optimal segmentation
         if use_cython:  # Use the cython implementation
             segmenting_cost_coefficients = np.array(f.batch_get(tau_hat, t))
+            minus_inf_values = compute_costs(tau_hat, f, t, phi=-np.inf)
             optimality_intervals = c_get_optimality_intervals(
-                tau_hat, segmenting_cost_coefficients, t
+                tau_hat, segmenting_cost_coefficients, t, minus_inf_values
             )
         else:  # Use the python implementation
             optimality_intervals = get_optimality_intervals(tau_hat, f, t)
