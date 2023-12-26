@@ -2,9 +2,6 @@ from typing import Callable, List, Optional
 
 import numpy as np
 
-from .c_optimality_intervals import (
-    get_optimality_intervals as c_get_optimality_intervals,
-)
 from .coefficients import get_recursive_coefficients, get_segment_coefficients
 from .optimality_intervals import get_optimality_intervals
 from .utils import (
@@ -55,6 +52,17 @@ def CPOP(
     1, ..., n
         The time indices we are going to use. We will make sure to substract 1 to t when indexing y.
     """
+
+    if use_cython:
+        try:
+            from .c_optimality_intervals import (
+                optimality_intervals as c_get_optimality_intervals,
+            )
+        except ImportError:
+            print(
+                "ERROR : The cython implementation of optimality_intervals was not found. Make sure you compiled it correctly. Falling back to the python implementation."
+            )
+            use_cython = False
 
     # Initialization
     n = len(y)
