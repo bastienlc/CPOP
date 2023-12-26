@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from .utils import SegmentingCostCoefficientsStore, get_values
+from .utils import SegmentingCostCoefficientsStore, compute_costs
 
 
 def get_optimality_intervals(
@@ -17,7 +17,7 @@ def get_optimality_intervals(
     tau_temp_indices = list(range(len(tau_hat)))
     optimality_intervals = [[] for _ in range(len(tau_hat))]
     current_phi = -np.inf
-    current_tau_index = np.argmin(get_values(tau_hat, f, t, phi=current_phi))
+    current_tau_index = np.argmin(compute_costs(tau_hat, f, t, phi=current_phi))
 
     while (current_tau_index in tau_temp_indices and len(tau_temp_indices) > 1) or (
         current_tau_index not in tau_temp_indices and len(tau_temp_indices) > 0

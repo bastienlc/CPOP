@@ -9,7 +9,7 @@ from .coefficients import get_recursive_coefficients, get_segment_coefficients
 from .optimality_intervals import get_optimality_intervals
 from .utils import (
     SegmentingCostCoefficientsStore,
-    get_values,
+    compute_costs,
     inequality_based_pruning,
     linear_segment_cost,
     precompute_sums,
@@ -121,6 +121,6 @@ def CPOP(
         print()
 
     # Return the changepoints that minimize the cost
-    changepoints = tau_hat[np.argmin(get_values(tau_hat, f, n))]
+    changepoints = tau_hat[np.argmin(compute_costs(tau_hat, f, n))]
 
     return [x - 1 for x in changepoints[1:]]
