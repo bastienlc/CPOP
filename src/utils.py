@@ -98,3 +98,11 @@ def precompute_sums(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     y_squarred_cumsum[:-1] = np.cumsum(y**2)
     return y_cumsum, y_linear_cumsum, y_squarred_cumsum
 
+
+def inequality_based_pruning(
+    tau_hat: List[List[int]], f: SegmentingCostCoefficientsStore, t: int, K: float
+):
+    minimums = get_values(tau_hat, f, t)
+    filter = minimums <= np.min(minimums) + K
+
+    return [tau_hat[i] for i, x in enumerate(filter) if x]
