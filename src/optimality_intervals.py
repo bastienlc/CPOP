@@ -9,11 +9,28 @@ from .utils import SegmentingCostCoefficientsStore, compute_costs
 def get_optimality_intervals(
     tau_hat: List[List[int]], f: SegmentingCostCoefficientsStore, t: int
 ) -> List[List[Tuple[float, float]]]:
-    """Returns the intervals on which each tau in tau_hat is the optimal tau"""
+    r"""Computes the intervals of :math:`\phi` on which each tau in tau_hat is the optimal tau. In the paper this corresponds to :math:`Int_{\tau}^{t}`. This algorithm is the one proposed in the paper.
+
+    Parameters
+    ----------
+    tau_hat : List[List[int]]
+        The segmentations for which we want to compute the optimality intervals.
+    f : SegmentingCostCoefficientsStore
+        The store containing the coefficients of the optimal cost for all the segmentations.
+    t : int
+        The current time.
+
+    Returns
+    -------
+    List[List[Tuple[float, float]]]
+        The optimality intervals for each segmentation in tau_hat.
+    """
+
+    # If there is only one segmentation, it is optimal on the whole interval
     if len(tau_hat) == 1:
         return [[(-np.inf, np.inf)]]
 
-    # Let's use the indices of tau_hat to keep track of the taus that are still in the set
+    # We use the indices of tau_hat to keep track of the taus that are still in the set
     tau_temp_indices = list(range(len(tau_hat)))
     optimality_intervals = [[] for _ in range(len(tau_hat))]
     current_phi = -np.inf
@@ -26,7 +43,7 @@ def get_optimality_intervals(
         indices_to_remove = []
         for i, tau_index in enumerate(tau_temp_indices):
             if tau_index == current_tau_index:
-                # We add a value only so that the indices of x_taus match the indices of tau_temp
+                # We add a value so that the indices of x_taus match the indices of tau_temp
                 x_taus[i] = np.inf
             else:
                 coefficients = f.get(tau_hat[tau_index], t) - f.get(
