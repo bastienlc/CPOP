@@ -306,16 +306,6 @@ def add_taus_and_coefficients_to_stores(
     # Inequality pruning : keep the previous taus if they were not pruned
     indices_not_pruned_ineq = indices[~np.isin(indices, indices_pruned_ineq)]
 
-    if t < n:
-        tau_store[0] = tau_store[0][
-            np.logical_or(
-                ~np.isin(tau_store[0], indices_pruned_ineq),
-                np.isin(tau_store[0], added_indices),
-            )
-        ]
-    else:
-        tau_store[0] = tau_store[0][indices_not_pruned_ineq]
-
     # Update the coefficients for the taus that were added at the previous iteration. The other coefficients are not needed.
     indices_to_store_coefficients_for = indices_not_pruned_ineq[
         tau_store[2][indices_not_pruned_ineq, tau_store[1][indices_not_pruned_ineq] - 1]
@@ -325,6 +315,20 @@ def add_taus_and_coefficients_to_stores(
     coefficients_store[indices_to_store_coefficients_for] = computed_coefficients[
         coefficients_indices_map[indices_to_store_coefficients_for]
     ]
+
+    if t < n:
+        tau_store[0] = tau_store[0][
+            np.logical_or(
+                ~np.isin(tau_store[0], indices_pruned_ineq),
+                np.isin(tau_store[0], added_indices),
+            )
+        ]
+    else:
+        tau_store[0] = indices_not_pruned_ineq
+        # At the last iteration we need to store all the coefficients
+        coefficients_store[tau_store[0]] = computed_coefficients[
+            coefficients_indices_map[tau_store[0]]
+        ]
 
     # Decrease stores sizes if needed
     if len(tau_store[0]) < len(tau_store[1]) // 4:

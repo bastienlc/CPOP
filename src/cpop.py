@@ -42,8 +42,6 @@ def CPOP(
         The standard deviation of the white gaussian noise, by default 1.
     verbose : bool, optional
         Whether to print the progress of the algorithm, by default False.
-    use_cython : bool, optional
-        Whether to use the cython implementation, by default False.
 
     Returns
     -------
@@ -116,7 +114,7 @@ def CPOP(
             n,
         )
 
-        if verbose:
+        if verbose and t % (n // 10) == 0:
             print(f"Iterations {t}/{n} : {len(tau_store[0])} taus stored", end="\r")
 
     if verbose:
