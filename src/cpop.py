@@ -4,8 +4,16 @@ import numpy as np
 
 from .coefficients import get_recursive_coefficients, get_segment_coefficients
 from .optimality_intervals import get_optimality_intervals
+from .stores import (
+    add_tau,
+    add_taus_and_coefficients_to_stores,
+    get_coefficients,
+    get_indices,
+    get_tau,
+    init_coefficients_store,
+    init_tau_store,
+)
 from .utils import (
-    SegmentingCostCoefficientsStore,
     compute_costs,
     inequality_based_pruning,
     linear_segment_cost,
@@ -19,7 +27,6 @@ def CPOP(
     h: Optional[Callable] = linear_segment_cost,
     sigma: Optional[float] = 1,
     verbose: Optional[bool] = False,
-    use_cython: Optional[bool] = False,
 ) -> List[int]:
     r"""Computes the optimal segmentation of y using the CPOP algorithm.
 
@@ -53,36 +60,31 @@ def CPOP(
         The time indices we are going to use. We will make sure to substract 1 to t when indexing y.
     """
 
-    if use_cython:
-        try:
-            from .c_optimality_intervals import (
-                get_optimality_intervals as c_get_optimality_intervals,
-            )
-        except ImportError:
-            print(
-                "ERROR : The cython implementation of optimality_intervals was not found. Make sure you compiled it correctly. Falling back to the python implementation."
-            )
-            use_cython = False
-
     # Initialization
     n = len(y)
-    # tau_hat is the set of all the segmentations we keep track of. We start with the empty segmentation.
-    tau_hat = [[0]]
-    f = SegmentingCostCoefficientsStore()
+    # tau_store is the set of all the segmentations we keep track of. We start with the empty segmentation.
+    tau_store = init_tau_store(y)
+    tau_store = add_tau(tau_store, np.array([0]), 1)
+    # coefficients_store is the set of all the segmentations costs we keep track of.
+    coefficients_store = init_coefficients_store()
+
     K = 2 * beta + h(1) + h(n)
     # Precompute the cumulative sums of y, y * t and y^2 to speed up the computations
     y_cumsum, y_linear_cumsum, y_squarred_cumsum = precompute_sums(y)
 
     # We keep to the indices of the paper (y = y_1, ..., y_n = y[1-1], ..., y[n-1]) to avoid confusions. In this case t ranges from 1 to n.
     for t in range(1, n + 1):
-        for tau in tau_hat:
+        indices = get_indices(tau_store)
+        new_coefficients = np.zeros((len(indices), 3), dtype=float)
+        for i, tau_index in enumerate(indices):
+            tau = get_tau(tau_store, tau_index)
             # Compute the coefficients of the optimal cost for the segmentation tau of y_1, ..., y_t with tau
-            if tau == [0]:  # Limit case where tau = [0]
-                coefficients = get_segment_coefficients(y, t, sigma, h)
+            if len(tau) == 1 and tau[0] == 0:  # Limit case where tau = [0]
+                new_coefficients[i, :] = get_segment_coefficients(y, t, sigma, h)
             else:  # General case using the recursion
-                coefficients = get_recursive_coefficients(
-                    tau,
-                    f,
+                new_coefficients[i, :] = get_recursive_coefficients(
+                    tau[-1],
+                    get_coefficients(coefficients_store, tau_index),
                     y_cumsum,
                     y_linear_cumsum,
                     y_squarred_cumsum,
@@ -91,45 +93,40 @@ def CPOP(
                     beta,
                     h,
                 )
-            # Store those coefficients
-            f.set(
-                tau,
-                t,
-                coefficients,
-            )
-
-        # For each tau in tau_hat, compute the intervals of phi on which tau is the optimal segmentation
-        if use_cython:  # Use the cython implementation
-            segmenting_cost_coefficients = np.array(f.batch_get(tau_hat, t))
-            minus_inf_values = compute_costs(tau_hat, f, t, phi=-np.inf)
-            optimality_intervals = c_get_optimality_intervals(
-                tau_hat, segmenting_cost_coefficients, t, minus_inf_values
-            )
-        else:  # Use the python implementation
-            optimality_intervals = get_optimality_intervals(tau_hat, f, t)
 
         # Functional pruning : we only keep the segmentations that are optimal for some phi
-        tau_star = [tau_hat[i] for i, x in enumerate(optimality_intervals) if x != []]
-        next_tau_hat = [tau + [t] for tau in tau_star]
+        indices_pruned_func = get_optimality_intervals(tau_store, new_coefficients, t)
 
         # Inequality based pruning : we only keep the segmentations that are not dominated by another segmentation
         # Contrarily to what is written in the paper we don't apply it to next_tau_hat as the optimal values of the segmentations in next_tau_hat will be computed in the next iteration
-        tau_hat = inequality_based_pruning(tau_hat, f, t, K)
+        indices_pruned_ineq = inequality_based_pruning(
+            tau_store, new_coefficients, t, K
+        )
 
-        # Finish functional pruning
-        if t < n:  # We don't want to do this at the last iteration
-            tau_hat += next_tau_hat
-
-        # Clean the store so that we don't store the coefficients that are not needed anymore. Maybe we should do this only every few iterations.
-        f.clean(tau_hat, t)
+        (
+            tau_store,
+            coefficients_store,
+        ) = add_taus_and_coefficients_to_stores(
+            tau_store,
+            coefficients_store,
+            new_coefficients,
+            indices_pruned_func,
+            indices_pruned_ineq,
+            t,
+            n,
+        )
 
         if verbose:
-            print(f"Iterations {t}/{n} : {len(tau_hat)} taus stored", end="\r")
+            print(f"Iterations {t}/{n} : {len(tau_store[0])} taus stored", end="\r")
 
     if verbose:
         print()
 
     # Return the changepoints that minimize the cost
-    changepoints = tau_hat[np.argmin(compute_costs(tau_hat, f, n))]
+    best_index = tau_store[0][
+        np.argmin(compute_costs(coefficients_store[tau_store[0]]))
+    ]
 
-    return [x - 1 for x in changepoints[1:]]
+    changepoints = tau_store[2][best_index, : tau_store[1][best_index]]
+
+    return changepoints[1:]  # Remove the first changepoint as it is always 0
