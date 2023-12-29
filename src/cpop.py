@@ -1,6 +1,7 @@
 from typing import Callable, List, Optional
 
 import numpy as np
+from numba import njit
 
 from .coefficients import get_recursive_coefficients, get_segment_coefficients
 from .optimality_intervals import get_optimality_intervals
@@ -21,6 +22,7 @@ from .utils import (
 )
 
 
+@njit
 def CPOP(
     y: np.ndarray,
     beta: float,
@@ -64,7 +66,7 @@ def CPOP(
     n = len(y)
     # tau_store is the set of all the segmentations we keep track of. We start with the empty segmentation.
     tau_store = init_tau_store(y)
-    tau_store = add_tau(tau_store, np.array([0]), 1)
+    tau_store = add_tau(tau_store, np.array([0], dtype=np.int64), 1)
     # coefficients_store is the set of all the segmentations costs we keep track of.
     coefficients_store = init_coefficients_store()
 
@@ -75,7 +77,7 @@ def CPOP(
     # We keep to the indices of the paper (y = y_1, ..., y_n = y[1-1], ..., y[n-1]) to avoid confusions. In this case t ranges from 1 to n.
     for t in range(1, n + 1):
         indices = get_indices(tau_store)
-        new_coefficients = np.zeros((len(indices), 3), dtype=float)
+        new_coefficients = np.zeros((len(indices), 3), dtype=np.float64)
         for i, tau_index in enumerate(indices):
             tau = get_tau(tau_store, tau_index)
             # Compute the coefficients of the optimal cost for the segmentation tau of y_1, ..., y_t with tau
@@ -117,9 +119,9 @@ def CPOP(
         )
 
         if verbose:
-            print(f"Iterations {t}/{n} : {len(tau_store[0])} taus stored", end="\r")
+            print(f"Iterations {t}/{n} : {len(tau_store[0])} taus stored")
 
-    if verbose:
+    if verbose and t % n // 10 == 0:
         print()
 
     # Return the changepoints that minimize the cost

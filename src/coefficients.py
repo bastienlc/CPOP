@@ -1,8 +1,10 @@
 from typing import Callable
 
 import numpy as np
+from numba import njit
 
 
+@njit
 def get_recursive_coefficients(
     s: int,
     past_coefficients: np.ndarray,
@@ -88,6 +90,7 @@ def get_recursive_coefficients(
     return np.array([a, b, c])
 
 
+@njit
 def get_segment_coefficients(
     y: np.ndarray,
     t: int,

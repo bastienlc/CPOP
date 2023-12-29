@@ -2,12 +2,15 @@ from math import sqrt
 from typing import List
 
 import numpy as np
+from numba import njit
 
 from .stores import TauStore, get_indices
+from .utils import custom_isin
 
 EPS = 1e-6
 
 
+@njit
 def minimum_at_minus_infinity(coefficients: np.ndarray) -> int:
     r"""Returns the index of the tau that is minimum at minus infinity.
 
@@ -43,6 +46,7 @@ def minimum_at_minus_infinity(coefficients: np.ndarray) -> int:
     return candidates[0]
 
 
+@njit
 def get_optimality_intervals(
     tau_store: TauStore, coefficients: np.ndarray, t: int
 ) -> np.ndarray:
@@ -64,13 +68,13 @@ def get_optimality_intervals(
     """
 
     temp_indices = get_indices(tau_store)
-    indices_store_map = np.zeros(len(tau_store[1]), dtype=int)
+    indices_store_map = np.zeros(len(tau_store[1]), np.int64)
     indices_store_map[temp_indices] = np.arange(len(temp_indices))
     indices_to_keep: List[int] = []
 
     # If there is only one segmentation, it is optimal on the whole interval
     if len(temp_indices) == 1:
-        return np.array([])
+        return np.zeros((0), dtype=np.int64)
 
     # Which tau is minimum at - inf ?
     current_phi = -np.inf
@@ -131,14 +135,14 @@ def get_optimality_intervals(
                     x_taus.append(np.inf)
 
         # First intersection
-        arg_min = np.argmin(x_taus)
+        arg_min = np.argmin(np.array(x_taus, dtype=np.float64))
         current_index = temp_indices[arg_min]
         current_phi = x_taus[arg_min]
         indices_to_keep.append(current_index)
 
         # Remove the indices that are never optimal
         temp_indices = temp_indices[
-            ~np.isin(temp_indices, indices_from_store_to_remove)
+            ~custom_isin(temp_indices, indices_from_store_to_remove)
         ]
 
-    return get_indices(tau_store)[~np.isin(get_indices(tau_store), indices_to_keep)]
+    return get_indices(tau_store)[~custom_isin(get_indices(tau_store), indices_to_keep)]

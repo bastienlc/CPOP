@@ -3,37 +3,15 @@
 from typing import List, Tuple
 
 import numpy as np
+from numba import njit
+
+from .types import CoefficientsStore, TauStore
+from .utils import custom_isin
 
 INITIAL_STORE_SIZE = 10
 
-TauStore = List[np.ndarray]
-"""A list to store current segmentations.
 
-TauStore
-    List[np.ndarray, np.ndarray, np.ndarray]
-
-TauStore[0]
-    np.ndarray[ndim=1,dtype=int]
-        The indices at which the current taus are stored. This is needed because we don't want to reconstruct the store at each iteration.
-
-TauStore[1]
-    np.ndarray[ndim=1,dtype=int]
-        The length of the current taus. Only the indices in TauStore[0] are valid, the other ones are garbage. We need this because the taus are of variable length. We looked into using a ragged array but it was not efficient in our case.
-
-TauStore[2]
-    np.ndarray[ndim=2,dtype=int]
-        The current taus. Only the indices in TauStore[0] are valid, the other ones are garbage. Each tau is of variable length and the last values are garbage. The values are valid up to the index in TauStore[1] - 1.
-"""
-
-CoefficientsStore = np.ndarray
-r"""An array to store segmentation costs. The segmentation cost is a quadratic polynomial in :math:`\phi`. We can store it as its three coefficients.
-
-CoefficientsStore
-    np.ndarray[ndim=2,dtype=float]
-        The current coefficients. Each row is a segmentation and each column is a coefficient. The first column is the constant coefficient, the second one is the linear coefficient and the third one is the quadratic coefficient. The rows index correspond exactly to the ones in TauStore[0], the other ones are garbage. The values correspond to the coefficients of the segmentations that were in TauStore[0] at the previous iteration. We only need to store the coefficients for the past iteration because we compute the coefficients for the current iteration using the coefficients of the past iteration.
-"""
-
-
+@njit
 def init_tau_store(y: np.ndarray) -> TauStore:
     """Initialize the tau store. The memory usage is not optimal (each tau has a fixed size corresponding to the biggest possible segmentation).
 
@@ -48,13 +26,14 @@ def init_tau_store(y: np.ndarray) -> TauStore:
         The initialized store.
     """
 
-    return [
-        np.array([], dtype=int),
-        np.zeros(INITIAL_STORE_SIZE, dtype=int),
-        np.zeros((INITIAL_STORE_SIZE, len(y)), dtype=int),
-    ]
+    return (
+        np.zeros((0), dtype=np.int64),
+        np.zeros((INITIAL_STORE_SIZE), dtype=np.int64),
+        np.zeros((INITIAL_STORE_SIZE, len(y)), dtype=np.int64),
+    )
 
 
+@njit
 def init_coefficients_store() -> CoefficientsStore:
     """Initialize the coefficients store.
 
@@ -64,9 +43,10 @@ def init_coefficients_store() -> CoefficientsStore:
         The initialized store.
     """
 
-    return np.zeros((INITIAL_STORE_SIZE, 3), dtype=float)
+    return np.zeros((INITIAL_STORE_SIZE, 3), dtype=np.float64)
 
 
+@njit
 def get_indices(tau_store: TauStore) -> np.ndarray:
     """Get the indices of the current taus.
 
@@ -83,6 +63,7 @@ def get_indices(tau_store: TauStore) -> np.ndarray:
     return tau_store[0]
 
 
+@njit
 def get_tau(tau_store: TauStore, index: int) -> np.ndarray:
     """Get the tau at the given index.
 
@@ -101,6 +82,7 @@ def get_tau(tau_store: TauStore, index: int) -> np.ndarray:
     return tau_store[2][index, : tau_store[1][index]]
 
 
+@njit
 def get_coefficients(coefficients_store: CoefficientsStore, index: int) -> np.ndarray:
     r"""Get the coefficients for the tau at the given index.
 
@@ -121,6 +103,7 @@ def get_coefficients(coefficients_store: CoefficientsStore, index: int) -> np.nd
     return coefficients_store[index, :]
 
 
+@njit
 def add_taus(
     tau_store: TauStore, taus: np.ndarray, lengths: np.ndarray
 ) -> Tuple[TauStore, np.ndarray]:
@@ -142,17 +125,24 @@ def add_taus(
     """
 
     spaces_to_fill = np.arange(len(tau_store[1]))
-    spaces_to_fill = spaces_to_fill[~np.isin(spaces_to_fill, tau_store[0])][: len(taus)]
+    spaces_to_fill = spaces_to_fill[~custom_isin(spaces_to_fill, tau_store[0])][
+        : len(taus)
+    ]
     tau_store[1][spaces_to_fill] = lengths
     tau_store[2][spaces_to_fill] = taus
 
-    return [
-        np.concatenate((tau_store[0], spaces_to_fill)),
+    new_indices = np.zeros((len(tau_store[0]) + len(spaces_to_fill)), dtype=np.int64)
+    new_indices[: len(tau_store[0])] = tau_store[0]
+    new_indices[len(tau_store[0]) :] = spaces_to_fill
+
+    return (
+        new_indices,
         tau_store[1],
         tau_store[2],
-    ], spaces_to_fill
+    ), spaces_to_fill
 
 
+@njit
 def add_tau(tau_store: TauStore, tau: np.ndarray, length: int) -> TauStore:
     """Add the given tau to the store.
 
@@ -170,10 +160,13 @@ def add_tau(tau_store: TauStore, tau: np.ndarray, length: int) -> TauStore:
     TauStore
         The updated store.
     """
-    new_store, _ = add_taus(tau_store, np.array([tau]), np.array([length]))
+    full_tau = np.zeros((1, tau_store[2].shape[1]), dtype=np.int64)
+    full_tau[0, :length] = tau
+    new_store, _ = add_taus(tau_store, full_tau, np.array([length], dtype=np.int64))
     return new_store
 
 
+@njit
 def increase_stores(
     tau_store: TauStore, coefficients_store: CoefficientsStore
 ) -> Tuple[TauStore, CoefficientsStore]:
@@ -193,18 +186,19 @@ def increase_stores(
         The updated stores.
     """
 
-    return [
+    return (
         tau_store[0],
-        np.concatenate((tau_store[1], np.zeros(len(tau_store[1]), dtype=int))),
+        np.concatenate((tau_store[1], np.zeros(len(tau_store[1]), dtype=np.int64))),
         np.concatenate(
             (
                 tau_store[2],
-                np.zeros((len(tau_store[2]), tau_store[2].shape[1]), dtype=int),
+                np.zeros((len(tau_store[2]), tau_store[2].shape[1]), dtype=np.int64),
             )
         ),
-    ], np.concatenate((coefficients_store, np.zeros((len(coefficients_store), 3))))
+    ), np.concatenate((coefficients_store, np.zeros((len(coefficients_store), 3))))
 
 
+@njit
 def decrease_stores(
     tau_store: TauStore, coefficients_store: CoefficientsStore
 ) -> Tuple[TauStore, CoefficientsStore]:
@@ -226,15 +220,16 @@ def decrease_stores(
     if len(tau_store[0]) < len(tau_store[1] // 4):
         indices_to_keep = tau_store[0]
         return (
-            [
+            (
                 np.arange(len(tau_store[0])),
                 tau_store[1][indices_to_keep],
                 tau_store[2][indices_to_keep],
-            ],
+            ),
             coefficients_store[indices_to_keep],
         )
 
 
+@njit
 def add_taus_and_coefficients_to_stores(
     tau_store: TauStore,
     coefficients_store: CoefficientsStore,
@@ -273,7 +268,7 @@ def add_taus_and_coefficients_to_stores(
         tau_store
     )  # Indices state when the coefficients were computed
     coefficients_indices_map = np.zeros(
-        len(coefficients_store), dtype=int
+        len(coefficients_store), dtype=np.int64
     )  # Array to map indices to coefficients indices
     coefficients_indices_map[indices] = np.arange(len(indices))
 
@@ -286,12 +281,11 @@ def add_taus_and_coefficients_to_stores(
 
     # Functional pruning : add new taus to the store if they were not pruned
     if t < n:
-        indices_not_pruned_func = indices[~np.isin(indices, indices_pruned_func)]
+        indices_not_pruned_func = indices[~custom_isin(indices, indices_pruned_func)]
 
         taus_not_pruned_func = tau_store[2][indices_not_pruned_func]
-        taus_not_pruned_func[
-            np.arange(len(taus_not_pruned_func)), tau_store[1][indices_not_pruned_func]
-        ] = t
+        for i in range(len(taus_not_pruned_func)):
+            taus_not_pruned_func[i, tau_store[1][indices_not_pruned_func[i]]] = t
 
         tau_store, added_indices = add_taus(
             tau_store,
@@ -304,27 +298,32 @@ def add_taus_and_coefficients_to_stores(
         ]
 
     # Inequality pruning : keep the previous taus if they were not pruned
-    indices_not_pruned_ineq = indices[~np.isin(indices, indices_pruned_ineq)]
+    indices_not_pruned_ineq = indices[~custom_isin(indices, indices_pruned_ineq)]
 
     if t < n:
-        tau_store[0] = tau_store[0][
+        new_indices = tau_store[0][
             np.logical_or(
-                ~np.isin(tau_store[0], indices_pruned_ineq),
-                np.isin(tau_store[0], added_indices),
+                ~custom_isin(tau_store[0], indices_pruned_ineq),
+                custom_isin(tau_store[0], added_indices),
             )
         ]
     else:
-        tau_store[0] = tau_store[0][indices_not_pruned_ineq]
+        new_indices = tau_store[0][indices_not_pruned_ineq]
 
     # Update the coefficients for the taus that were added at the previous iteration. The other coefficients are not needed.
-    indices_to_store_coefficients_for = indices_not_pruned_ineq[
-        tau_store[2][indices_not_pruned_ineq, tau_store[1][indices_not_pruned_ineq] - 1]
-        == t - 1
-    ]
+    indices_to_store_coefficients_for: List[int] = []
+    for index in indices_not_pruned_ineq:
+        if tau_store[2][index, tau_store[1][index] - 1] == t - 1:
+            indices_to_store_coefficients_for.append(index)
+    indices_to_store_coefficients_for = np.array(
+        indices_to_store_coefficients_for, dtype=np.int64
+    )
 
     coefficients_store[indices_to_store_coefficients_for] = computed_coefficients[
         coefficients_indices_map[indices_to_store_coefficients_for]
     ]
+
+    tau_store = (new_indices, tau_store[1], tau_store[2])
 
     # Decrease stores sizes if needed
     if len(tau_store[0]) < len(tau_store[1]) // 4:

@@ -1,10 +1,12 @@
 from typing import Tuple, Union
 
 import numpy as np
+from numba import njit
 
-from .stores import TauStore
+from .types import TauStore
 
 
+@njit
 def compute_costs(
     coefficients: np.ndarray,
     phi: Union[None, float] = None,
@@ -35,6 +37,7 @@ def compute_costs(
         )
 
 
+@njit
 def linear_segment_cost(seg_len: int) -> float:
     """
     The segment cost function used in the paper. It is linear in the segment length, and is equal to 0 for a segment of length 0.
@@ -52,6 +55,7 @@ def linear_segment_cost(seg_len: int) -> float:
     return float(seg_len)
 
 
+@njit
 def precompute_sums(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Precomputes the cumulative sums of y, y * t and y**2. This is used to speed up the computations. The cumulative sums are returned with an additional 0 at the end to handle potential empty segments.
@@ -76,6 +80,7 @@ def precompute_sums(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return y_cumsum, y_linear_cumsum, y_squarred_cumsum
 
 
+@njit
 def inequality_based_pruning(
     tau_store: TauStore, coefficients: np.ndarray, t: int, K: float
 ) -> np.ndarray:
@@ -102,3 +107,27 @@ def inequality_based_pruning(
     filter = minimums > np.min(minimums) + K
 
     return tau_store[0][filter]
+
+
+@njit
+def custom_isin(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Custom implementation of np.isin. This function is needed because np.isin is not supported by numba.
+
+    Parameters
+    ----------
+    a : np.ndarray
+        The array to check.
+    b : np.ndarray
+        The values to check for.
+
+    Returns
+    -------
+    np.ndarray
+        The indices of the values in b that are in a.
+    """
+    result = np.zeros(len(a), dtype=np.bool_)
+
+    for el in b:
+        result[a == el] = True
+
+    return result
