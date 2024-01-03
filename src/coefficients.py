@@ -1,13 +1,11 @@
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 
-from .utils import SegmentingCostCoefficientsStore
-
 
 def get_recursive_coefficients(
-    tau: List[int],
-    f: SegmentingCostCoefficientsStore,
+    s: int,
+    past_coefficients: np.ndarray,
     y_cumsum: np.ndarray,
     y_linear_cumsum: np.ndarray,
     y_squarred_cumsum: np.ndarray,
@@ -24,10 +22,10 @@ def get_recursive_coefficients(
 
     Parameters
     ----------
-    tau : List[int]
-        The segmentation for which we compute the optimal cost.
-    f : SegmentingCostCoefficientsStore
-        The store containing the coefficients of the optimal cost for all the segmentations. It is used to retrieve the coefficients of the optimal cost for the segmentation :math:`tau_1, ..., tau_{k-1}` of :math:`y_1, ..., y_{tau_k}`.
+    s : int
+        The last changepoint of the segmentation :math:`\tau`.
+    past_coefficients : np.ndarray
+        The coefficients of the optimal cost for the segmentation :math:`tau_1, ..., tau_{k-1}` of :math:`y_1, ..., y_{tau_k}`.
     y_cumsum : np.ndarray
         The cumulative sum of the time series. y_cumsum[i] = y[0] + ... + y[i] and y_cumsum[-1] = 0.
     y_linear_cumsum : np.ndarray
@@ -51,7 +49,6 @@ def get_recursive_coefficients(
 
     # s = :math:`tau_k`, we make sure to substract 1 to s when indexing y.
     # y is split between y[0], ..., y[s-1] (recursion) and y[s], ..., y[t-1] (new segment cost)
-    s = tau[-1]
     seg_len = t - s
 
     A = (seg_len + 1) * (2 * seg_len + 1) / (6 * seg_len * sigma**2)
@@ -77,15 +74,13 @@ def get_recursive_coefficients(
     E = -C - 2 / sigma**2 * (y_cumsum[t - 1] - y_cumsum[s - 1])
     F = (seg_len - 1) * (2 * seg_len - 1) / (6 * seg_len * sigma**2)
 
-    recursive_coeffs = f.get(tau[:-1], s)
-
     # Minimizing over :math:`\phi'` we have the following polynomial in :math:`\phi`
-    a = A - B**2 / 4 / (recursive_coeffs[0] + F)
-    b = C - (recursive_coeffs[1] + E) * B / 2 / (recursive_coeffs[0] + F)
+    a = A - B**2 / 4 / (past_coefficients[0] + F)
+    b = C - (past_coefficients[1] + E) * B / 2 / (past_coefficients[0] + F)
     c = (
-        recursive_coeffs[2]
+        past_coefficients[2]
         + D
-        - (recursive_coeffs[1] + E) ** 2 / 4 / (recursive_coeffs[0] + F)
+        - (past_coefficients[1] + E) ** 2 / 4 / (past_coefficients[0] + F)
         + beta
         + h(seg_len)
     )
