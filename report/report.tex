@@ -1,6 +1,9 @@
 \documentclass[11pt]{article}
 \usepackage{theme}
 \usepackage{shortcuts}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{amsmath}
 % Document parameters
 % Document title
 \title{Detecting Changes in Slope With an $L_0$ Penalty}
@@ -134,7 +137,60 @@ This theorem allows to further prune the set $\hat{\mathcal{T}}_t$.
 
 \subsection{Algorithm}
 
+The two difficulties of the implementation are storing the coefficients of the polynomials $f^t_{\boldsymbol{\tau}}(\phi)$, and implementing the pruning techniques. The authors provided relatively detailed pseudo-code for the algorithm, but we still found it difficult to implement.
 
+The goal of this first algorithm is to only keep segmentations that are optimal for some values of $\phi$. Segmentation costs are polynomials, so this algorithm starts from the optimum segmentation for $\phi=-\infty$ and iteratively finds the next optimum segmentation by looking at the points where the polynoms intersect.
+\begin{algorithm}[H]
+    \caption{Functional pruning algorithm}
+    \begin{algorithmic}[1]
+        \State \textbf{Input:} Candidate segmentations $\hat{\mathcal{T}}_{t}$, costs $f^{t}_{{\tau}}(\phi)$ for ${\tau}\in\hat{\mathcal{T}}_{t}$.
+
+        \State \textbf{Initialize:} $\phi_\text{curr}=-\infty \quad {\tau}_{curr}=\underset{{\tau}\in\hat{\mathcal{T}}_{t}}{ \arg\min}\left[f^{t}_{{\tau}}(\phi_{curr})\right]\quad \mathcal{T}_{temp}=\hat{\mathcal{T}}_{t}\setminus \left\{\tau_{curr}\right\}\quad \mathcal{T}^*_t=\left\{\tau_{curr}\right\}$
+
+        \While{$\mathcal{T}_{temp}\neq\emptyset$}
+
+        \For{$\tau\in\mathcal{T}_{temp}$}
+        \State $x_{\tau}=\min\left\{\phi:f^{t}_{\tau}(\phi)-f^{t}_{{\tau}_{curr}}(\phi)=0\;\;\&\;\;\phi>\phi_{curr}\right\}$
+        \If {$x_{\tau}=\emptyset$}
+        \State $\mathcal{T}_{temp}=\mathcal{T}_{temp}\setminus\left\{\tau\right\}$
+        \EndIf
+        \EndFor
+
+        \State $\tau_{curr}=\underset{\tau\in\mathcal{T}_{temp}}{\arg\min}(x_{\tau})$
+        \State $\phi_{curr}=x_{\tau_{curr}}$
+        \State $\mathcal{T}^*_t=\mathcal{T}^*_t\cup\left\{\tau_{curr}\right\}$
+        \EndWhile
+
+        \State \textbf{Output:} $\mathcal{T}^*_t$
+    \end{algorithmic}
+\end{algorithm}
+
+Then we can define the full algorithm that uses both pruning techniques.
+\begin{algorithm}[H]
+    \caption{CPOP}
+    \begin{algorithmic}[1]
+        \State \textbf{Input:} Data $y=y_1,\dots,y_n$, penalty $\beta$ and segment cost $h$.
+
+        \State \textbf{Initialize:} $\hat{\mathcal{T}}_1=\left\{\left\{0\right\}\right\}$
+
+        \For {$t=1,\dots,n$} \Comment{Cost computation}
+        \For {$\tau\in\hat{\mathcal{T}}_t$}
+        \If {$\tau = \left\{0\right\}$}\Comment{No changepoint}
+        \State $f^t_{\tau}(\phi)=\min_{\phi'}\mathcal{C}(y[1:t],\phi',\phi)+h(t)$
+        \Else \Comment{Compute recursively}
+        \State $f^t_{\tau}(\phi)=\min_{\phi'}\left(f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}(\phi')+\mathcal{C}(y[\tau_k+1:t],\phi',\phi)+h(t-\tau_k)+\beta\right)$
+        \EndIf
+        \EndFor
+
+        \State $\mathcal{T}^*_t = \text{functional\_pruning}(\hat{\mathcal{T}}_t, f^t)$
+
+        \State $\hat{\mathcal{T}}_{t+1}= \left\{\tau\in \hat{\mathcal{T}}_t \big| \min_\phi f_\tau^t(\phi)\leq \min_{\phi',\tau'}f_{\tau'}^t(\phi')+K\right\}\cup \left\{(\tau, t)\big|\tau\in \mathcal{T}^*_t\right\}$
+        \EndFor
+
+        \State \textbf{Output:} $\argmin_{\tau\in \hat{\mathcal{T}}_n}[\min_\phi f^n_\tau(\phi)]$
+    \end{algorithmic}
+\end{algorithm}
+We note that we only need to store the coefficients for $f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}$.
 
 \section{Data}
 \textit{
