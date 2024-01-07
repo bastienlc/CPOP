@@ -13,6 +13,7 @@ def get_recursive_coefficients(
     sigma: float,
     beta: float,
     h: Callable,
+    return_phi_prime: bool = False,
 ) -> np.ndarray:
     r"""
     Computes the optimal coefficients for :math:`f_{\tau}^{t}(\phi)` in the case where tau!=[0].
@@ -51,6 +52,8 @@ def get_recursive_coefficients(
     # y is split between y[0], ..., y[s-1] (recursion) and y[s], ..., y[t-1] (new segment cost)
     seg_len = t - s
 
+
+
     A = (seg_len + 1) * (2 * seg_len + 1) / (6 * seg_len * sigma**2)
     B = (seg_len + 1) / sigma**2 - (seg_len + 1) * (2 * seg_len + 1) / (
         3 * seg_len * sigma**2
@@ -75,17 +78,29 @@ def get_recursive_coefficients(
     F = (seg_len - 1) * (2 * seg_len - 1) / (6 * seg_len * sigma**2)
 
     # Minimizing over :math:`\phi'` we have the following polynomial in :math:`\phi`
-    a = A - B**2 / 4 / (past_coefficients[0] + F)
-    b = C - (past_coefficients[1] + E) * B / 2 / (past_coefficients[0] + F)
-    c = (
-        past_coefficients[2]
-        + D
-        - (past_coefficients[1] + E) ** 2 / 4 / (past_coefficients[0] + F)
-        + beta
-        + h(seg_len)
-    )
+    # a = A - B**2 / 4 / (past_coefficients[0] + F)
+    # b = C - (past_coefficients[1] + E) * B / 2 / (past_coefficients[0] + F)
+    # c = (
+    #     past_coefficients[2]
+    #     + D
+    #     - (past_coefficients[1] + E) ** 2 / 4 / (past_coefficients[0] + F)
+    #     + beta
+    #     + h(seg_len)
+    # )
 
-    return np.array([a, b, c])
+    a_, b_, c_ = past_coefficients
+
+    alpha = -(E+b_)/2/(F+c_)
+    gamma = -B/2/(F+c_)
+
+    a = a_ + b_*alpha + c_*alpha**2 + D + E*alpha + F*alpha**2 + h(seg_len) + beta
+    b = b_*gamma + 2*c_*alpha*gamma + B*alpha + C + E*gamma + 2*F*alpha*gamma
+    c = c_*gamma**2 + A + B*gamma + F*gamma**2
+
+    if return_phi_prime:
+        return np.array([a, b, c]), (alpha, gamma)
+    else:
+        return np.array([a, b, c])
 
 
 def get_segment_coefficients(
@@ -93,6 +108,7 @@ def get_segment_coefficients(
     t: int,
     sigma: float,
     h: Callable,
+    return_phi_prime: bool = False,
 ) -> np.ndarray:
     r"""Computes the optimal coefficients for :math:`f_{[0]}^{t}(\phi)` in the limit case where tau=[0]. In all fairness we could have used the same function as for the recursive case but we wanted to make it clear that we are in the limit case.
 
@@ -112,8 +128,14 @@ def get_segment_coefficients(
     np.ndarray
         The three coefficients in the polynomial :math:`f_{[0]}^{t}(\phi)\ =a_{[0]}^{t}+b_{[0]}^{t}\phi+c_{[0]}^{t}\phi^2`
     """
+    y0 = y[0]
     y = y[:t]
+    # print(y)
+    # print(len(y))
     seg_len = len(y)
+
+    # print(seg_len)
+    # print(t)
 
     A = (seg_len + 1) * (2 * seg_len + 1) / (6 * seg_len * sigma**2)
     B = (seg_len + 1) / sigma**2 - (seg_len + 1) * (2 * seg_len + 1) / (
@@ -123,12 +145,24 @@ def get_segment_coefficients(
     D = 1 / sigma**2 * np.sum(y**2)
     E = -C - 2 / sigma**2 * np.sum(y)
     F = (seg_len - 1) * (2 * seg_len - 1) / (6 * seg_len * sigma**2)
-
+    # print("HELLOOO")
     if F == 0:  # Case where there is a single point. We return the ||.||_2^2 error.
         return np.array([y[0] ** 2, -2 * y[0], 1])
     else:  # Case where there are at least two points. The optimal cost is a polynomial in phi.
-        a = D - E**2 / 4 / F + h(seg_len)
-        b = C - B * E / 2 / F
-        c = A + B**2 / 4 / F
+        alpha = -E/2/F
+        gamma = -B/2/F
+        a = D + alpha*E + F*alpha**2 + h(seg_len)
+        b = alpha*B + C + E*gamma + 2*F*alpha*gamma
+        c = A + B*gamma + F*gamma**2
+        # a = D - E**2 / 4 / F + h(seg_len)
+        # b = C - B * E / 2 / F
+        # c = A - B**2 / 4 / F
 
-        return np.array([a, b, c])
+        # print(alpha, gamma)
+
+        # print(h(seg_len))
+        # print("HELLOOO")
+        if return_phi_prime:
+            return np.array([a, b, c]), [alpha, gamma]
+        else:
+            return np.array([a, b, c])#, phi_prime

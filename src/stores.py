@@ -143,7 +143,15 @@ def add_taus(
 
     spaces_to_fill = np.arange(len(tau_store[1]))
     spaces_to_fill = spaces_to_fill[~np.isin(spaces_to_fill, tau_store[0])][: len(taus)]
-    tau_store[1][spaces_to_fill] = lengths
+    try :
+        tau_store[1][spaces_to_fill] = lengths
+    except:
+        print()
+        print(spaces_to_fill, "spaces_to_fill")
+        print(tau_store[1], "tau_store[1]")
+        print(taus, "taus")
+        print(lengths, "lengths")
+        raise ValueError
     tau_store[2][spaces_to_fill] = taus
 
     return [
@@ -207,7 +215,7 @@ def increase_stores(
 
 def decrease_stores(
     tau_store: TauStore, coefficients_store: CoefficientsStore
-) -> Tuple[TauStore, CoefficientsStore]:
+) -> Tuple[TauStore, CoefficientsStore]: 
     """Remove the garbage from the stores. This changes the indices of the taus and coefficients.
 
     Parameters
@@ -268,7 +276,19 @@ def add_taus_and_coefficients_to_stores(
     TauStore, CoefficientsStore
         The updated stores.
     """
-
+    debug = False
+    if t < 105 and debug:
+        # print("tau_store[0]", tau_store[0])
+        # print("tau_store[1]", tau_store[1][8])
+        print("before", t)
+        print("tau_store[2]", tau_store[2][8][:tau_store[1][8]])
+        print("coefficients_store", list(coefficients_store)[8])
+        print()
+    if t > 301 and debug:
+        print("before", t)
+        print("tau_store[2]", tau_store[2][108][:tau_store[1][108]])
+        print("coefficients_store", list(coefficients_store)[108])
+        print()
     indices = get_indices(
         tau_store
     )  # Indices state when the coefficients were computed
@@ -278,14 +298,22 @@ def add_taus_and_coefficients_to_stores(
     coefficients_indices_map[indices] = np.arange(len(indices))
 
     # Update stores sizes if needed
+    indices_pruned = np.intersect1d(indices_pruned_func, indices_pruned_ineq)
     number_of_taus_to_add = (
-        len(tau_store[0]) - len(indices_pruned_func) - len(indices_pruned_ineq)
+        len(tau_store[0]) - len(indices_pruned)
     )
+
+    # print()
+    # print("indices pruned func", (indices_pruned_func))
+    # print("indices pruned ineq", (indices_pruned_ineq))
+    # print(len(tau_store[1]) - len(tau_store[0]))
+    # print(number_of_taus_to_add)
+
     if number_of_taus_to_add > len(tau_store[1]) - len(tau_store[0]):
         tau_store, coefficients_store = increase_stores(tau_store, coefficients_store)
 
     # Functional pruning : add new taus to the store if they were not pruned
-    if t < n:
+    if t < n-1:
         indices_not_pruned_func = indices[~np.isin(indices, indices_pruned_func)]
 
         taus_not_pruned_func = tau_store[2][indices_not_pruned_func]
@@ -306,17 +334,27 @@ def add_taus_and_coefficients_to_stores(
     # Inequality pruning : keep the previous taus if they were not pruned
     indices_not_pruned_ineq = indices[~np.isin(indices, indices_pruned_ineq)]
 
+
     # Update the coefficients for the taus that were added at the previous iteration. The other coefficients are not needed.
     indices_to_store_coefficients_for = indices_not_pruned_ineq[
         tau_store[2][indices_not_pruned_ineq, tau_store[1][indices_not_pruned_ineq] - 1]
         == t - 1
     ]
 
-    coefficients_store[indices_to_store_coefficients_for] = computed_coefficients[
-        coefficients_indices_map[indices_to_store_coefficients_for]
-    ]
+    if t < 105 and debug:
+        # print("tau_store[0]", tau_store[0])
+        # print("tau_store[1]", tau_store[1][8])
+        print("MID", t)
+        print("tau_store[2]", tau_store[2][8][:tau_store[1][8]])
+        print("coefficients_store", list(coefficients_store)[8])
+        print()
 
-    if t < n:
+    # coefficients_store[indices_to_store_coefficients_for] = computed_coefficients[
+    #     coefficients_indices_map[indices_to_store_coefficients_for]
+    # ]
+
+
+    if t < n-1:
         tau_store[0] = tau_store[0][
             np.logical_or(
                 ~np.isin(tau_store[0], indices_pruned_ineq),
@@ -330,6 +368,19 @@ def add_taus_and_coefficients_to_stores(
             coefficients_indices_map[tau_store[0]]
         ]
 
+    if t < 105 and debug:
+        # print("tau_store[0]", tau_store[0])
+        # print("tau_store[1]", tau_store[1][8])
+        print("after", t)
+        print("tau_store[2]", tau_store[2][8][:tau_store[1][8]])
+        print("coefficients_store", list(coefficients_store)[8])
+        print()
+
+    if t > 301 and debug:
+        print("after", t)
+        print("tau_store[2]", tau_store[2][108][:tau_store[1][108]])
+        print("coefficients_store", list(coefficients_store)[108])
+        print()
     # Decrease stores sizes if needed
     if len(tau_store[0]) < len(tau_store[1]) // 4:
         tau_store, coefficients_store = decrease_stores(tau_store, coefficients_store)

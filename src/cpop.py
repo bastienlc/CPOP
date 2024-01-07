@@ -17,6 +17,7 @@ from .utils import (
     compute_costs,
     inequality_based_pruning,
     linear_segment_cost,
+    log_segment_cost,
     precompute_sums,
 )
 
@@ -24,7 +25,8 @@ from .utils import (
 def CPOP(
     y: np.ndarray,
     beta: float,
-    h: Optional[Callable] = linear_segment_cost,
+    h_type: Optional[Callable] = log_segment_cost,
+    scale : Optional[float] = 1,
     sigma: Optional[float] = 1,
     verbose: Optional[bool] = False,
 ) -> List[int]:
@@ -57,7 +59,7 @@ def CPOP(
     1, ..., n
         The time indices we are going to use. We will make sure to substract 1 to t when indexing y.
     """
-
+    debug = False
     # Initialization
     n = len(y)
     # tau_store is the set of all the segmentations we keep track of. We start with the empty segmentation.
@@ -66,12 +68,16 @@ def CPOP(
     # coefficients_store is the set of all the segmentations costs we keep track of.
     coefficients_store = init_coefficients_store()
 
+    h = h_type(scale)
+
     K = 2 * beta + h(1) + h(n)
     # Precompute the cumulative sums of y, y * t and y^2 to speed up the computations
     y_cumsum, y_linear_cumsum, y_squarred_cumsum = precompute_sums(y)
 
+    optimal_tau = np.array([  0,   5,   6,  97, 136, 142, 144, 183, 185, 188, 197, 198, 203,
+       218, 239, 256, 257, 286, 287, 300, 301])
     # We keep to the indices of the paper (y = y_1, ..., y_n = y[1-1], ..., y[n-1]) to avoid confusions. In this case t ranges from 1 to n.
-    for t in range(1, n + 1):
+    for t in range(1, n):
         indices = get_indices(tau_store)
         new_coefficients = np.zeros((len(indices), 3), dtype=float)
         for i, tau_index in enumerate(indices):
@@ -79,6 +85,10 @@ def CPOP(
             # Compute the coefficients of the optimal cost for the segmentation tau of y_1, ..., y_t with tau
             if len(tau) == 1 and tau[0] == 0:  # Limit case where tau = [0]
                 new_coefficients[i, :] = get_segment_coefficients(y, t, sigma, h)
+                if (tau == optimal_tau[:len(tau)]).all() and t == optimal_tau[1] and debug:
+                    print(t, sigma)
+                    print(new_coefficients[i, :])
+                    print()
             else:  # General case using the recursion
                 new_coefficients[i, :] = get_recursive_coefficients(
                     tau[-1],
@@ -91,20 +101,22 @@ def CPOP(
                     beta,
                     h,
                 )
+                cond = tau == optimal_tau[:len(tau)]
+                if debug and np.array(tau == optimal_tau[:len(tau)]).all() and t in optimal_tau:
+                    print("tau", get_tau(tau_store, tau_index))
+                    print("t", t)
+                    print(get_coefficients(coefficients_store, tau_index))
+                    print(new_coefficients[i, :])
+                    print()
 
         # Functional pruning : we only keep the segmentations that are optimal for some phi
         indices_pruned_func = get_optimality_intervals(tau_store, new_coefficients, t)
 
         # Inequality based pruning : we only keep the segmentations that are not dominated by another segmentation
         # Contrarily to what is written in the paper we don't apply it to next_tau_hat as the optimal values of the segmentations in next_tau_hat will be computed in the next iteration
-        indices_pruned_ineq = inequality_based_pruning(
-            tau_store, new_coefficients, t, K
-        )
+        indices_pruned_ineq = inequality_based_pruning(tau_store, new_coefficients, t, K)
 
-        (
-            tau_store,
-            coefficients_store,
-        ) = add_taus_and_coefficients_to_stores(
+        (tau_store,coefficients_store) = add_taus_and_coefficients_to_stores(
             tau_store,
             coefficients_store,
             new_coefficients,
@@ -126,5 +138,15 @@ def CPOP(
     ]
 
     changepoints = tau_store[2][best_index, : tau_store[1][best_index]]
+    if changepoints[-1] != len(y) - 1:
+        # print("Remark: the last changepoint is not the last index of y")
+        changepoints = np.array(list(changepoints) + [len(y) - 1])
 
-    return changepoints[1:]  # Remove the first changepoint as it is always 0
+    coeff_store = coefficients_store[tau_store[0]]
+    idx_min = np.argmin(compute_costs(coeff_store))
+    optimal_coefficients = coeff_store[idx_min]
+    # print("optimal tau:", tau_store[2][idx_min])
+    # print("optimal cost:", np.min(compute_costs(coefficients_store[tau_store[0]])))
+    # print(get_coefficients(coefficients_store, idx_min))
+    # print(optimal_coefficients)
+    return changepoints#, coeff_store, tau_store#, tau_store, coefficients_store  # Remove the first changepoint as it is always 0

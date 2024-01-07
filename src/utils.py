@@ -35,7 +35,7 @@ def compute_costs(
         )
 
 
-def linear_segment_cost(seg_len: int) -> float:
+class linear_segment_cost():
     """
     The segment cost function used in the paper. It is linear in the segment length, and is equal to 0 for a segment of length 0.
 
@@ -49,7 +49,31 @@ def linear_segment_cost(seg_len: int) -> float:
     float
         The segment cost.
     """
-    return float(seg_len)
+    def __init__(self, scale):
+        self.scale = scale
+
+    def __call__(self, seg_len: int) -> float:
+        return self.scale * float(seg_len)
+
+class log_segment_cost():
+    """
+    The segment cost function used in the paper. It is linear in the segment length, and is equal to 0 for a segment of length 0.
+
+    Parameters
+    ----------
+    seg_len : int
+        The length of the segment.
+
+    Returns
+    -------
+    float
+        The segment cost.
+    """
+    def __init__(self, scale):
+        self.scale = scale
+
+    def __call__(self, seg_len: int) -> float:
+        return self.scale * np.log(float(seg_len))
 
 
 def precompute_sums(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -102,3 +126,4 @@ def inequality_based_pruning(
     filter = minimums > np.min(minimums) + K
 
     return tau_store[0][filter]
+
