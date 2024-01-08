@@ -21,6 +21,6 @@ def test_get_optimality_intervals():
     )
     coefficients = np.array([[12, 10, 3], [4, 5, 3], [7, 8, 3]], dtype=float)
 
-    indices_to_remove = get_optimality_intervals(tau_store, coefficients, t=4)
+    indices_to_remove = get_optimality_intervals(tau_store, coefficients)
     # Each tau is optimal on some interval
     assert np.array_equal(indices_to_remove, np.array([]))
