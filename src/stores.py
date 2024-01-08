@@ -30,7 +30,7 @@ r"""An array to store segmentation costs. The segmentation cost is a quadratic p
 
 CoefficientsStore
     np.ndarray[ndim=2,dtype=float]
-        The current coefficients. Each row is a segmentation and each column is a coefficient. The first column is the constant coefficient, the second one is the linear coefficient and the third one is the quadratic coefficient. The rows index correspond exactly to the ones in TauStore[0], the other ones are garbage. The values correspond to the coefficients of the segmentations that were in TauStore[0] at the previous iteration. We only need to store the coefficients for the past iteration because we compute the coefficients for the current iteration using the coefficients of the past iteration.
+        The current coefficients. Each row is a segmentation and each column is a coefficient. The first column is the constant coefficient, the second one is the linear coefficient and the third one is the quadratic coefficient. The rows index correspond exactly to the ones in TauStore[0], the other ones are garbage. The costs we store are generally not the ones for the current time, but the ones that will be used in recursive calls.
 """
 
 
@@ -278,14 +278,14 @@ def add_taus_and_coefficients_to_stores(
     coefficients_indices_map[indices] = np.arange(len(indices))
 
     # Update stores sizes if needed
-    number_of_taus_to_add = (
-        len(tau_store[0]) - len(indices_pruned_func) - len(indices_pruned_ineq)
-    )
+    indices_pruned = np.intersect1d(indices_pruned_func, indices_pruned_ineq)
+    number_of_taus_to_add = len(tau_store[0]) - len(indices_pruned)
+
     if number_of_taus_to_add > len(tau_store[1]) - len(tau_store[0]):
         tau_store, coefficients_store = increase_stores(tau_store, coefficients_store)
 
     # Functional pruning : add new taus to the store if they were not pruned
-    if t < n:
+    if t < n - 1:
         indices_not_pruned_func = indices[~np.isin(indices, indices_pruned_func)]
 
         taus_not_pruned_func = tau_store[2][indices_not_pruned_func]
@@ -306,20 +306,10 @@ def add_taus_and_coefficients_to_stores(
     # Inequality pruning : keep the previous taus if they were not pruned
     indices_not_pruned_ineq = indices[~np.isin(indices, indices_pruned_ineq)]
 
-    # Update the coefficients for the taus that were added at the previous iteration. The other coefficients are not needed.
-    indices_to_store_coefficients_for = indices_not_pruned_ineq[
-        tau_store[2][indices_not_pruned_ineq, tau_store[1][indices_not_pruned_ineq] - 1]
-        == t - 1
-    ]
-
-    coefficients_store[indices_to_store_coefficients_for] = computed_coefficients[
-        coefficients_indices_map[indices_to_store_coefficients_for]
-    ]
-
-    if t < n:
+    if t < n - 1:
         tau_store[0] = tau_store[0][
             np.logical_or(
-                ~np.isin(tau_store[0], indices_pruned_ineq),
+                np.isin(tau_store[0], indices_not_pruned_ineq),
                 np.isin(tau_store[0], added_indices),
             )
         ]
