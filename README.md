@@ -32,15 +32,6 @@ The report is available [here](report/report.pdf).
 
 The main code is available in the `src` folder. It contains an implementation of the CPOP algorithm in Python. The notebook `experiments.ipynb` contains the experiments we ran to test the algorithm.
 
-## TO DO
-
-- [x] Implement the CPOP algorithm in Python
-- [x] Implement the pruning steps
-- [x] Debug and optimize the algorithm
-- [ ] Update the tests
-- [ ] Add tests for the core functions (coefficients computation and pruning)
-- [ ] Optimize memory usage when storing current segmentations
-
 ## Contributors
 
 [@bastienlc](https://github.com/bastienlc),
