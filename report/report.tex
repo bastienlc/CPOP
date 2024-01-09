@@ -7,8 +7,9 @@
 \usepackage{amsmath}
 \usepackage{stmaryrd}
 \usepackage[numbers,square]{natbib}
+\bibliographystyle{unsrtnat}
 % Document parameters
-% Document title 
+% Document title
 \title{Detecting Changes in Slope With an $L_0$ Penalty}
 \author{
 Bastien LE CHENADEC \email{bastien.le-chenadec@eleves.enpc.fr} \\ % student 1
@@ -26,7 +27,7 @@ While an implementation of the algorithm was already available online in R and C
 
 Both contributors spent a considerable amount of time on the implementation of the algorithm. While, Bastien L.C. implemented the algorithm in Python and heavily optimized it to make it run in a reasonable time, Sofiane E. thoroughly debugged the algorithm (notably finding and correcting errors in the original paper's computations), and ran the experiments. The report was jointly written by both contributors.
 
- We chose to test the algorithm on Tunisian stock market data, and we experimented with different values of the penalty parameter $\beta$ and the segment cost $h$.
+We chose to test the algorithm on Tunisian stock market data, and we experimented with different values of the penalty parameter $\beta$ and the segment cost $h$.
 
 \section{Method}
 
@@ -140,9 +141,6 @@ We used the same methodology to investigate the influence of the segment cost $h
 $$ h(s) = \gamma \log(s), $$ where $\gamma$ is the parameter we will vary in this experiment.
 
 We see on figure \ref{fig:approximations_gamma} the influence of $\gamma$ on the predicted approximation. An interesting phenomenon is that we could at first expect that, in order to reduce $h$, the algorithm would tend to split the largest segments into smaller segments, but we see that this is not the case. Indeed, since the segment cost is logarithmic, the algorithm tends to split the smallest segments into even smaller segments, which is why we see that the number of changepoints detected doesn't necessarily decrease when $\gamma$ increases. Furthermore, this explains why, as $\gamma$ increases, we see distinct parts of the signal with a denser number of changepoints.
-
-
-\bibliography{bibliography}
 
 \newpage
 \section{Appendix}
@@ -359,5 +357,8 @@ where,
     \caption{Approximations obtained for values of $\gamma \in \{0.1, 1, 5, 10, 20\}$ and $\beta = 1$, on the "Placement de Tunisie - Sicaf" (PLTU) stock.}
     \label{fig:approximations_gamma}
 \end{figure}
+
+\newpage
+\bibliography{bibliography}
 
 \end{document}
