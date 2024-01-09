@@ -30,7 +30,7 @@ The report is available [here](report/report.pdf).
 
 ## Code
 
-The main code is available in the `src` folder. It contains an implementation of the CPOP algorithm in Python.
+The main code is available in the `src` folder. It contains an implementation of the CPOP algorithm in Python. The notebook `experiments.ipynb` contains the experiments we ran to test the algorithm.
 
 ## TO DO
 
