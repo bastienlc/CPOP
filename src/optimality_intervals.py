@@ -44,7 +44,7 @@ def minimum_at_minus_infinity(coefficients: np.ndarray) -> int:
 
 
 def get_optimality_intervals(
-    tau_store: TauStore, coefficients: np.ndarray, t: int
+    tau_store: TauStore, coefficients: np.ndarray
 ) -> np.ndarray:
     r"""Computes the intervals of :math:`\phi` on which each tau in tau_store is the optimal tau. In the paper this corresponds to :math:`Int_{\tau}^{t}`. This algorithm is the one proposed in the paper. Returns the indices of the taus that are never optimal.
 
@@ -54,8 +54,6 @@ def get_optimality_intervals(
         The store containing the current taus.
     coefficients : np.ndarray
         The optimal coefficients for each tau in tau_store.
-    t : int
-        The current time.
 
     Returns
     -------
@@ -85,6 +83,7 @@ def get_optimality_intervals(
         indices_from_store_to_remove: List[int] = []
         for index in temp_indices:
             if index == current_index:  # Skip the current tau
+                indices_from_store_to_remove.append(index)
                 x_taus.append(np.inf)
             else:
                 # Polynomial difference
@@ -101,14 +100,14 @@ def get_optimality_intervals(
                         x_taus.append(np.inf)
                         continue
                     else:
-                        root1 = -coefs[1] + sqrt(delta) / 2 / coefs[2]
-                        root2 = -coefs[1] - sqrt(delta) / 2 / coefs[2]
+                        root1 = (-coefs[1] + sqrt(delta)) / 2 / coefs[2]
+                        root2 = (-coefs[1] - sqrt(delta)) / 2 / coefs[2]
                 else:
                     if coefs[1] != 0:
                         root1 = -coefs[0] / coefs[1]
                         root2 = -coefs[0] / coefs[1]
                     else:
-                        if coefs[0] > 0:
+                        if coefs[0] >= 0:
                             # This tau can be removed, skip it
                             indices_from_store_to_remove.append(index)
                             x_taus.append(np.inf)
@@ -121,7 +120,7 @@ def get_optimality_intervals(
 
                 # Only keep roots larger than the current phi
                 if root1 > current_phi + EPS and root2 > current_phi + EPS:
-                    x_taus.append(min(root1, root2))
+                    x_taus.append(min(root1, root2))  # lol
                 elif root1 > current_phi + EPS:
                     x_taus.append(root1)
                 elif root2 > current_phi + EPS:
@@ -134,6 +133,7 @@ def get_optimality_intervals(
         arg_min = np.argmin(x_taus)
         current_index = temp_indices[arg_min]
         current_phi = x_taus[arg_min]
+
         indices_to_keep.append(current_index)
 
         # Remove the indices that are never optimal

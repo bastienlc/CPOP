@@ -4,8 +4,9 @@
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 \usepackage{amsmath}
+\newcommand{\jump}{\newline\newline}
 % Document parameters
-% Document title
+% Document title 
 \title{Detecting Changes in Slope With an $L_0$ Penalty}
 \author{
 Bastien LE CHENADEC \email{bastien.le-chenadec@eleves.enpc.fr} \\ % student 1
@@ -193,13 +194,36 @@ Then we can define the full algorithm that uses both pruning techniques.
 We note that we only need to store the coefficients for $f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}$.
 
 \section{Data}
-\textit{
-    The Data section (indicative length : 1 page) should provide a deep analysis of the data used for experiment. In particular, we are interested here in your capacity to provide relevant and thoughtful feedbacks on the data and to demonstrate that you master some "data diagnosis" tools that have been dealt with in the lectures/tutorials.
-}
-
+\subsection{Data description : Tunisian stock market}
+Financial data, and more specifically stock prices across time, are a good candidate to test the method. Indeed, stock prices, taken at a relatively low frequency (daily) are known to exhibit clear trends, while being noisy enough to make the detection of changepoints interesting. And since the method is designed to detect changepoints in a piecewise linear model, it is well suited for this kind of data.
+\jump
+We test the method on the stock prices of all the listed companies on the Bourse de Tunis, which is Tunisia stock exchange. The data was taken from Kagglee, and is available at \url{https://www.kaggle.com/datasets/amariaziz/tunisian-stock-market}. It contains the Open, High, Low and Close prices of 88 companies, as well as the volume of transactions. We only use the Close prices, which are the prices at the end of the trading day.
+\subsection{Data preprocessing}
+Since the data was partially collected by web scraping, it naturally requires some cleaning and preprocessing. We detail here the steps we took to clean the data. We are left with $85$ companies.
+\paragraph*{Stocks with too few data points} We see on figure \ref{fig:histogram_size} that the number of data points per company is very variable. We remove the stocks that have less than $200$ data points, since they are not interesting for our analysis.
+\paragraph*{Missing values and duplicates} Missing values are days where we have corrupted data for a given stock. We see in table \ref{tab:missing_values} that the data is relatively clean of missing values, with only $3$ companies having no more than a few percent of missing values. We see on figure \ref{fig:bar_duplicates} that each stock has between $1\%$ and $3\%$ of duplicates. We remove the missing values as well as the duplicates.
+\paragraph*{Missing days} Missing days are days where we have no data at all for a given stock. We see on figure \ref{fig:bar_missing_days} that the number of missing days is clearly the biggest issue with the data, with most stocks having more than $40\%$ of missing days. We deal with this issue by interpolating the missing days, using a linear interpolation between the last and next available data points. We note that this is not a perfect solution, since it assumes that the stock price evolves linearly between two days, which is never the case for stock prices. However, it is a simple solution that allows us to keep the data for all the stocks.
+\paragraph*{Data shrinkage by sub-sampling} Since our method is relatively slow for time series longer than a few thousand points, and since our available computational power is limited, we sub-sample the data to reduce its size. We sub-sample the data by only keeping at most $1000$ points per stock, by sampling uniformly on the time axis. We see on figure \ref{fig:subsample} that this sub-sampling very slightly affects the data.
 \section{Results}
-\textit{
-    The Result section (indicative length : 1 to 2 pages) should display numerical simulations on real data. If you re-used some existing implementations, it is expected that this section develops new experiments that were not present in the original article. Results should be discussed not only based on quantative scores but also on qualitative aspects. In particular (especially if your article focuses on black box methods), please provide some feedbacks whether the method was adapted to the data or not and whether the hypothesis behind the approach you used were validated or not.
-}
+We present here a few experiments that we conducted on the $85$ Tunisian stocks we preprocessed. First, we zoom on a few stocks to see how the method behaves and we qualitatively compare it to a best-fitting piecewise constant mean model. Second, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. Third, we investigate the influence of the segment cost $h$ on the number of changepoints detected. Finally, we briefly discuss the computational complexity of the method.
+\subsection{Qualitative comparison with a piecewise constant mean model}
+We compare the method to a piecewise constant mean model, which is the simplest model that can be used to detect changepoints. We note that the nature of the data (stock prices) puts the piecewise constant mean model at a great disadvantage, since stock prices are known to exhibit piecewise linear trends. We only perform this comparison qualitatively.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.495\textwidth]{figures/comparaison CPOP PELT/PELT.png}
+    \includegraphics[width=0.495\textwidth]{figures/comparaison CPOP PELT/CPOP.png}
+    \caption{Comparison of the PELT method (left) and the CPOP method (right) on the stock of the company "Amen Bank" (AB).}
+    \label{fig:comparison}
+\end{figure}
 
+We see on figure \ref{fig:comparison} that the CPOP method is able to detect the changepoints much more accurately than the PELT method. More precisely, the PELT method exhibits a clear tendency to detect multiple changepoints between two consecutive CPOP changepoints. This is due to the fact that the PELT method is, by design, only able to detect changes in the mean of the signal; Therefore, along a steep trend, as the signal rapidly and monotonically varies, it will detect multiple changepoints, while the CPOP method will only detect one changepoint at the beginning of the trend and one at the end.
+
+\subsection{Influence of the penalty parameter $\beta$}
+Next, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. We see on figure \ref{fig:beta} that the number of changepoints detected is a decreasing function of $\beta$. This is consistent with the fact $\beta$ penalizes the number of changepoints.
+
+\subsection{Influence of the segment cost $h$}
+
+\subsection{Computational complexity}
+
+\section{Appendix}
 \end{document}

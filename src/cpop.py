@@ -1,8 +1,9 @@
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 import numpy as np
 
 from .coefficients import get_recursive_coefficients, get_segment_coefficients
+from .costs import LogCost, SegmentCost
 from .optimality_intervals import get_optimality_intervals
 from .stores import (
     add_tau,
@@ -13,18 +14,13 @@ from .stores import (
     init_coefficients_store,
     init_tau_store,
 )
-from .utils import (
-    compute_costs,
-    inequality_based_pruning,
-    linear_segment_cost,
-    precompute_sums,
-)
+from .utils import compute_costs, inequality_based_pruning, precompute_sums
 
 
 def CPOP(
     y: np.ndarray,
     beta: float,
-    h: Optional[Callable] = linear_segment_cost,
+    h: SegmentCost = LogCost(1),
     sigma: Optional[float] = 1,
     verbose: Optional[bool] = False,
 ) -> List[int]:
@@ -36,8 +32,8 @@ def CPOP(
         The time series to segment.
     beta : float
         The L0 penalty for the number of segments.
-    h : Callable, optional
-        The segment length penalty function, by default linear_segment_cost.
+    h : SegmentCost, optional
+        The segment length penalty, by default LogCost.
     sigma : float, optional
         The standard deviation of the white gaussian noise, by default 1.
     verbose : bool, optional
@@ -46,7 +42,7 @@ def CPOP(
     Returns
     -------
     List[int]
-        The changepoints of the optimal segmentation. These changepoints are indiced from 0 to n-1, and exclude :math:`\tau_0=0` and :math:`\tau_{m+1}=n`.
+        The changepoints of the optimal segmentation. These changepoints are indiced from 0 to n-1, and exclude :math:`\tau_0` and :math:`\tau_{m+1}`.
 
     Notations
     ---------
@@ -71,16 +67,16 @@ def CPOP(
     y_cumsum, y_linear_cumsum, y_squarred_cumsum = precompute_sums(y)
 
     # We keep to the indices of the paper (y = y_1, ..., y_n = y[1-1], ..., y[n-1]) to avoid confusions. In this case t ranges from 1 to n.
-    for t in range(1, n + 1):
+    for t in range(1, n):
         indices = get_indices(tau_store)
         new_coefficients = np.zeros((len(indices), 3), dtype=float)
         for i, tau_index in enumerate(indices):
             tau = get_tau(tau_store, tau_index)
             # Compute the coefficients of the optimal cost for the segmentation tau of y_1, ..., y_t with tau
             if len(tau) == 1 and tau[0] == 0:  # Limit case where tau = [0]
-                new_coefficients[i, :] = get_segment_coefficients(y, t, sigma, h)
+                new_coefficients[i, :], _, _ = get_segment_coefficients(y, t, sigma, h)
             else:  # General case using the recursion
-                new_coefficients[i, :] = get_recursive_coefficients(
+                new_coefficients[i, :], _, _ = get_recursive_coefficients(
                     tau[-1],
                     get_coefficients(coefficients_store, tau_index),
                     y_cumsum,
@@ -93,7 +89,7 @@ def CPOP(
                 )
 
         # Functional pruning : we only keep the segmentations that are optimal for some phi
-        indices_pruned_func = get_optimality_intervals(tau_store, new_coefficients, t)
+        indices_pruned_func = get_optimality_intervals(tau_store, new_coefficients)
 
         # Inequality based pruning : we only keep the segmentations that are not dominated by another segmentation
         # Contrarily to what is written in the paper we don't apply it to next_tau_hat as the optimal values of the segmentations in next_tau_hat will be computed in the next iteration
@@ -101,10 +97,7 @@ def CPOP(
             tau_store, new_coefficients, t, K
         )
 
-        (
-            tau_store,
-            coefficients_store,
-        ) = add_taus_and_coefficients_to_stores(
+        (tau_store, coefficients_store) = add_taus_and_coefficients_to_stores(
             tau_store,
             coefficients_store,
             new_coefficients,
@@ -127,4 +120,5 @@ def CPOP(
 
     changepoints = tau_store[2][best_index, : tau_store[1][best_index]]
 
-    return changepoints[1:]  # Remove the first changepoint as it is always 0
+    # We substract 1 to the changepoints to get the indices from 0 to n-1, and remove the first changepoint (tau_0)
+    return changepoints[1:] - 1

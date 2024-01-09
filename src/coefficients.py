@@ -1,6 +1,8 @@
-from typing import Callable
+from typing import Tuple
 
 import numpy as np
+
+from .costs import SegmentCost
 
 
 def get_recursive_coefficients(
@@ -12,8 +14,8 @@ def get_recursive_coefficients(
     t: int,
     sigma: float,
     beta: float,
-    h: Callable,
-) -> np.ndarray:
+    h: SegmentCost,
+) -> Tuple[np.ndarray, float, float]:
     r"""
     Computes the optimal coefficients for :math:`f_{\tau}^{t}(\phi)` in the case where tau!=[0].
 
@@ -38,13 +40,13 @@ def get_recursive_coefficients(
         The standard deviation of the white gaussian noise.
     beta : float
         The L0 penalty for the number of segments.
-    h : Callable
-        The segment length penalty function.
+    h : SegmentCost
+        The segment length penalty.
 
     Returns
     -------
-    np.ndarray
-        The three coefficients in the polynomial :math:`f_{\tau}^{t}(\phi)\ =a_{\tau}^{t}+b_{\tau}^{t}\phi+c_{\tau}^{t}\phi^2`
+    Tuple[np.ndarray, float, float]
+        An array containing the three coefficients in the polynomial :math:`f_{\tau}^{t}(\phi)\ =a_{\tau}^{t}+b_{\tau}^{t}\phi+c_{\tau}^{t}\phi^2`, and the coefficients alpha and gamma that relate the optimal cost of :math:`f_{\tau}^{t}(\phi)` to the optimal cost of :math:`f_{\tau_1, ..., tau_{k-1}}^{tau_k}(\phi')` with :math:`\phi' = \alpha + \gamma \phi`.
     """
 
     # s = :math:`tau_k`, we make sure to substract 1 to s when indexing y.
@@ -75,25 +77,38 @@ def get_recursive_coefficients(
     F = (seg_len - 1) * (2 * seg_len - 1) / (6 * seg_len * sigma**2)
 
     # Minimizing over :math:`\phi'` we have the following polynomial in :math:`\phi`
-    a = A - B**2 / 4 / (past_coefficients[0] + F)
-    b = C - (past_coefficients[1] + E) * B / 2 / (past_coefficients[0] + F)
-    c = (
-        past_coefficients[2]
-        + D
-        - (past_coefficients[1] + E) ** 2 / 4 / (past_coefficients[0] + F)
-        + beta
-        + h(seg_len)
-    )
+    alpha = -(E + past_coefficients[1]) / 2 / (F + past_coefficients[2])
+    gamma = -B / 2 / (F + past_coefficients[2])
 
-    return np.array([a, b, c])
+    a = (
+        past_coefficients[0]
+        + past_coefficients[1] * alpha
+        + past_coefficients[2] * alpha**2
+        + D
+        + E * alpha
+        + F * alpha**2
+        + h(seg_len)
+        + beta
+    )
+    b = (
+        past_coefficients[1] * gamma
+        + 2 * past_coefficients[2] * alpha * gamma
+        + B * alpha
+        + C
+        + E * gamma
+        + 2 * F * alpha * gamma
+    )
+    c = past_coefficients[2] * gamma**2 + A + B * gamma + F * gamma**2
+
+    return np.array([a, b, c]), alpha, gamma
 
 
 def get_segment_coefficients(
     y: np.ndarray,
     t: int,
     sigma: float,
-    h: Callable,
-) -> np.ndarray:
+    h: SegmentCost,
+) -> Tuple[np.ndarray, float, float]:
     r"""Computes the optimal coefficients for :math:`f_{[0]}^{t}(\phi)` in the limit case where tau=[0]. In all fairness we could have used the same function as for the recursive case but we wanted to make it clear that we are in the limit case.
 
     Parameters
@@ -104,15 +119,16 @@ def get_segment_coefficients(
         The current time. We are computing the cost of the segment y_1, ..., y_t = y[0], ..., y[t-1].
     sigma : float
         The standard deviation of the white gaussian noise.
-    h : Callable
-        The segment length penalty function.
+    h : SegmentCost
+        The segment length penalty.
 
     Returns
     -------
-    np.ndarray
-        The three coefficients in the polynomial :math:`f_{[0]}^{t}(\phi)\ =a_{[0]}^{t}+b_{[0]}^{t}\phi+c_{[0]}^{t}\phi^2`
+    Tuple[np.ndarray, float, float]
+        An array containing the three coefficients in the polynomial :math:`f_{\tau}^{t}(\phi)\ =a_{\tau}^{t}+b_{\tau}^{t}\phi+c_{\tau}^{t}\phi^2`, and the coefficients alpha and gamma that relate the optimal cost of :math:`f_{\tau}^{t}(\phi)` to the optimal cost of :math:`f_{\tau_1, ..., tau_{k-1}}^{tau_k}(\phi')` with :math:`\phi' = \alpha + \gamma \phi`.
     """
     y = y[:t]
+
     seg_len = len(y)
 
     A = (seg_len + 1) * (2 * seg_len + 1) / (6 * seg_len * sigma**2)
@@ -123,12 +139,13 @@ def get_segment_coefficients(
     D = 1 / sigma**2 * np.sum(y**2)
     E = -C - 2 / sigma**2 * np.sum(y)
     F = (seg_len - 1) * (2 * seg_len - 1) / (6 * seg_len * sigma**2)
-
     if F == 0:  # Case where there is a single point. We return the ||.||_2^2 error.
         return np.array([y[0] ** 2, -2 * y[0], 1])
     else:  # Case where there are at least two points. The optimal cost is a polynomial in phi.
-        a = D - E**2 / 4 / F + h(seg_len)
-        b = C - B * E / 2 / F
-        c = A + B**2 / 4 / F
+        alpha = -E / 2 / F
+        gamma = -B / 2 / F
+        a = D + alpha * E + F * alpha**2 + h(seg_len)
+        b = alpha * B + C + E * gamma + 2 * F * alpha * gamma
+        c = A + B * gamma + F * gamma**2
 
-        return np.array([a, b, c])
+        return np.array([a, b, c]), alpha, gamma
