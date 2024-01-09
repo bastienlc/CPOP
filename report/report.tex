@@ -3,6 +3,7 @@
 \usepackage{shortcuts}
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
+\usepackage{mathtools}
 \usepackage{amsmath}
 \newcommand{\jump}{\newline\newline}
 % Document parameters
@@ -199,13 +200,16 @@ Financial data, and more specifically stock prices across time, are a good candi
 \jump
 We test the method on the stock prices of all the listed companies on the Bourse de Tunis, which is Tunisia stock exchange. The data was taken from Kagglee, and is available at \url{https://www.kaggle.com/datasets/amariaziz/tunisian-stock-market}. It contains the Open, High, Low and Close prices of 88 companies, as well as the volume of transactions. We only use the Close prices, which are the prices at the end of the trading day.
 \subsection{Data preprocessing}
-Since the data was partially collected by web scraping, it naturally requires some cleaning and preprocessing. We detail here the steps we took to clean the data. We are left with $85$ companies.
-\paragraph*{Stocks with too few data points} We see on figure \ref{fig:histogram_size} that the number of data points per company is very variable. We remove the stocks that have less than $200$ data points, since they are not interesting for our analysis.
+Since the data was partially collected by web scraping, it naturally requires some cleaning and preprocessing. We detail here the steps we took to clean the data.
+\paragraph*{Stocks with too few data points} We see on figure \ref{fig:histogram_size} that the number of data points per company is very variable. We remove the stocks that have less than $200$ data points, since they are not interesting for our analysis. We are left with $85$ companies.
 \paragraph*{Missing values and duplicates} Missing values are days where we have corrupted data for a given stock. We see in table \ref{tab:missing_values} that the data is relatively clean of missing values, with only $3$ companies having no more than a few percent of missing values. We see on figure \ref{fig:bar_duplicates} that each stock has between $1\%$ and $3\%$ of duplicates. We remove the missing values as well as the duplicates.
 \paragraph*{Missing days} Missing days are days where we have no data at all for a given stock. We see on figure \ref{fig:bar_missing_days} that the number of missing days is clearly the biggest issue with the data, with most stocks having more than $40\%$ of missing days. We deal with this issue by interpolating the missing days, using a linear interpolation between the last and next available data points. We note that this is not a perfect solution, since it assumes that the stock price evolves linearly between two days, which is never the case for stock prices. However, it is a simple solution that allows us to keep the data for all the stocks.
 \paragraph*{Data shrinkage by sub-sampling} Since our method is relatively slow for time series longer than a few thousand points, and since our available computational power is limited, we sub-sample the data to reduce its size. We sub-sample the data by only keeping at most $1000$ points per stock, by sampling uniformly on the time axis. We see on figure \ref{fig:subsample} that this sub-sampling very slightly affects the data.
+
 \section{Results}
 We present here a few experiments that we conducted on the $85$ Tunisian stocks we preprocessed. First, we zoom on a few stocks to see how the method behaves and we qualitatively compare it to a best-fitting piecewise constant mean model. Second, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. Third, we investigate the influence of the segment cost $h$ on the number of changepoints detected. Finally, we briefly discuss the computational complexity of the method.
+\jump
+In all the experiments, we use a segment cost $h$ of the form $ h(s) = \gamma \log(s), $ where $\gamma$ is a parameter to fix and $s$ is the length of the segment. We also fix the parameter $\sigma$ depending on the stock, by using the very classical Median Absolute Deviation (MAD) estimator first introduced in \cite{hampel1974}.
 \subsection{Qualitative comparison with a piecewise constant mean model}
 We compare the method to a piecewise constant mean model, which is the simplest model that can be used to detect changepoints. We note that the nature of the data (stock prices) puts the piecewise constant mean model at a great disadvantage, since stock prices are known to exhibit piecewise linear trends. We only perform this comparison qualitatively.
 \begin{figure}[h]
@@ -219,11 +223,178 @@ We compare the method to a piecewise constant mean model, which is the simplest 
 We see on figure \ref{fig:comparison} that the CPOP method is able to detect the changepoints much more accurately than the PELT method. More precisely, the PELT method exhibits a clear tendency to detect multiple changepoints between two consecutive CPOP changepoints. This is due to the fact that the PELT method is, by design, only able to detect changes in the mean of the signal; Therefore, along a steep trend, as the signal rapidly and monotonically varies, it will detect multiple changepoints, while the CPOP method will only detect one changepoint at the beginning of the trend and one at the end.
 
 \subsection{Influence of the penalty parameter $\beta$}
-Next, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. We see on figure \ref{fig:beta} that the number of changepoints detected is a decreasing function of $\beta$. This is consistent with the fact $\beta$ penalizes the number of changepoints.
+Next, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. We see on figure \ref{fig:cgpts_beta} that the number of changepoints is a decreasing function of $\beta$, which is natural since $\beta$ penalizes the number of changepoints. We visualize the approximations obtained for values of $\beta \in \{0.1, 1, 5, 10, 20\}$ and $\gamma = 1$, on figure \ref{fig:approximations_beta}.
+\jump
+In particular, on figure \ref{fig:approximations_beta}, we see that almost all the data points are being detected for $\beta=0.1$ which, again, is a very normal behaviour, since we get a very minimal mean-square error $\sum C$ as well as a very small cost for the segments $\sum h$ if we allow for a lot of changepoints.
+\jump
+Furthermore, we see that the number of changepoints detected is the same for $\beta = 10$ and $\beta = 20$. This is due to the fact that the segment cost $\sum h$, which penalizes the length of the segments, as well as the mean-square error $\sum C$, which penalizes the distance between the data and the approximation, are both dominant compared to the effect of penalization for $\beta$ values in this $[10,20]$ range.
 
 \subsection{Influence of the segment cost $h$}
+We used the same methodology to investigate the influence of the segment cost $h$ on the number of changepoints detected. We recall that the segment cost $h$, which penalizes the length of the segments, was chosen of the form,
+$$ h(s) = \gamma \log(s), $$ where $\gamma$ is a parameter.
+\jump
+We see on figure \ref{fig:approximations_gamma} the influence of $\gamma$ on the number of changepoints detected. An interesting phenomenon is that we could at first expect that, in order to reduce $h$, the algorithm would tend to split the largest segments into smaller segments, but we see that this is not the case. Indeed, since the segment cost is logarithmic, the algorithm tends to split the smallest segments into even smaller segments, which is why we see that the number of changepoints detected doesn't necessarily decrease when $\gamma$ increases. Furthermore, this explains why, as $\gamma$ increases, we see distinct parts of the signal with a denser number of changepoints.
 
 \subsection{Computational complexity}
 
+\clearpage
 \section{Appendix}
+\subsection{Correction of the computed coefficients of the polynomials $f^t_{\boldsymbol{\tau}}(\phi)$}
+The authors provide a calculation of the coefficients of the polynomials $f^t_{\boldsymbol{\tau}}(\phi)$ in Appendix C of the supplementary material of \cite{mainarticle}. However, we found several mistakes in their calculations. We detail here the corrections we made.
+\jump
+The computation of the coefficients $A,\dots,F$ of $\mathcal{C}(y_{\tau_k+1:t},\phi',\phi)$ is correct. We therefore take,
+\begin{equation}
+    \mathcal{C}(y_{\tau_k+1:t},\phi',\phi) = A\phi^2+B\phi'\phi + C\phi + D + E\phi'+F{\phi'}^2,
+\end{equation}
+with the coefficients $A,\dots,F$ given by the authors.
+\jump
+We have to solve the following minimization problem,
+\begin{equation}
+    f_{\boldsymbol{\tau}}^t(\phi) = \min_{\phi'}\underbrace{\left(f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}(\phi')+\mathcal{C}(y_{\tau_k+1:t},\phi',\phi)+h(t-\tau_k)+\beta\right)}_{\vcentcolon = g_\phi(\phi')}.
+\end{equation}
+We note that $g_\phi$ is a quadratic polynomial in $\phi'$ since $\mathcal{C}$ is a quadratic polynomial in $\phi'$ and $f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}$ is a quadratic polynomial in $\phi'$ by induction hypothesis. We define, to simplify the notations,
+\begin{equation*}
+    f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}(\phi') = \hat{a} + \hat{b}\phi' + \hat{c}{\phi'}^2.
+\end{equation*}
+We can therefore write,
+\begin{equation*}
+    g_\phi(\phi') = \hat{a} + \hat{b}\phi' + \hat{c}{\phi'}^2 + A\phi^2+B\phi'\phi + C\phi + D + E\phi'+F{\phi'}^2 + h(t-\tau_k)+\beta.
+\end{equation*}
+First, we compute the derivative of $g_\phi$,
+\begin{equation*}
+    g_\phi'(\phi') = \hat{b} + 2\hat{c}\phi' + B\phi + E + 2F\phi',
+\end{equation*}
+and we set it to $0$ to find the minimum of $g_\phi$, which gives,
+\begin{equation*}
+    \phi' = -\frac{E + \hat{b}}{2(F+\hat{c})} - \frac{B}{2(F+\hat{c})}\phi.
+\end{equation*}
+To further simplify the notations, we define,
+\begin{equation*}
+        \alpha_1 = -\frac{E + \hat{b}}{2(F+\hat{c})} \quad \text{and} \quad \alpha_2 = - \frac{B}{2(F+\hat{c})} \quad \implies \quad \phi' = \alpha_1 + \alpha_2\phi.
+\end{equation*}
+We can now compute the value of $g_\phi$ at the minimum, which gives us the value of $f_{\boldsymbol{\tau}}^t(\phi)$ of the form,
+$$ f_{\boldsymbol{\tau}}^t(\phi) = a + b\phi + c\phi^2. $$
+where,
+\begin{equation*}
+    \begin{cases}
+        a = \hat{a} + \hat{b}\alpha_1 + \hat{c}\alpha_1^2 + D + E\alpha_1 + F\alpha_1^2 + \beta + h(t-\tau_k), \\
+        b = \hat{b}\alpha_2 + 2\hat{c}\alpha_1\alpha_2 + B\alpha_1 + C + E\alpha_2 + 2F\alpha_1\alpha_2, \\
+        c = \hat{c}\alpha_2^2 + A + B\alpha_2 + F\alpha_2^2.
+    \end{cases}
+\end{equation*}
+\subsection{Preprocessing figures and tables}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|}
+        \hline
+        Stock & Number of missing values & Percentage of missing values \\
+        \hline
+        AST   & 10                       & 1.51\%                       \\
+        PLTU  & 10                       & 3.19\%                       \\
+        SIMPA & 2                        & 0.1\%                        \\
+        \hline
+    \end{tabular}
+    \caption{Number and percentage of missing values per stock.}
+    \label{tab:missing_values}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/preprocessing/histogram_size.png}
+    \caption{Histogram of the number of data points per stock.}
+    \label{fig:histogram_size}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.75\textwidth}
+    \includegraphics[width=\textwidth]{figures/preprocessing/bar_duplicates.png}
+    \caption{Percentage of missing values per stock. The stocks are sorted by decreasing percentage of missing values.}
+    \label{fig:bar_duplicates}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.75\textwidth}
+    \includegraphics[width=\textwidth]{figures/preprocessing/bar_missing_days.png}
+    \caption{Percentage of missing days per stock. The stocks are sorted by decreasing percentage of missing days.}
+    \label{fig:bar_missing_days}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.7\textwidth}
+    \includegraphics[width=\textwidth]{figures/preprocessing/subsample.png}
+    \caption{Comparison of the original data and the sub-sampled data on the "Placement de Tunisie - Sicaf" (PLTU) stock.}
+    \label{fig:subsample}
+    \end{minipage}
+\end{figure}
+
+\subsection{Results figures}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.52\textwidth}
+    \includegraphics[width=\textwidth]{figures/results/cgpts_beta.png}
+    \caption{Number of changepoints detected as a function of the penalty parameter $\beta$.}
+    \label{fig:cgpts_beta}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/beta_analysis_scale_1_stock_PLTU/beta_0.1.png}
+    \end{minipage}
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/beta_analysis_scale_1_stock_PLTU/beta_1.png}
+    \end{minipage}
+
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/beta_analysis_scale_1_stock_PLTU/beta_5.png}
+    \end{minipage}
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/beta_analysis_scale_1_stock_PLTU/beta_10.png}
+    \end{minipage}
+
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/beta_analysis_scale_1_stock_PLTU/beta_20.png}
+    \end{minipage}
+    \begin{minipage}[t]{0.42\textwidth}
+        \hspace{0.42\textwidth}
+    \end{minipage}
+    \caption{Approximations obtained for values of $\beta \in \{0.1, 1, 5, 10, 20\}$ and $\gamma = 1$, on the "Placement de Tunisie - Sicaf" (PLTU) stock.}
+    \label{fig:approximations_beta}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/scale_analysis_beta_1_stock_PLTU/scale_0.1.png}
+    \end{minipage}
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/scale_analysis_beta_1_stock_PLTU/scale_1.png}
+    \end{minipage}
+
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/scale_analysis_beta_1_stock_PLTU/scale_5.png}
+    \end{minipage}
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/scale_analysis_beta_1_stock_PLTU/scale_10.png}
+    \end{minipage}
+
+    \begin{minipage}[t]{0.42\textwidth}
+        \includegraphics[width=\textwidth]{figures/results/scale_analysis_beta_1_stock_PLTU/scale_20.png}
+    \end{minipage}
+    \begin{minipage}[t]{0.42\textwidth}
+        \hspace{0.42\textwidth}
+    \end{minipage}
+
+    \caption{Approximations obtained for values of $\gamma \in \{0.1, 1, 5, 10, 20\}$ and $\beta = 1$, on the "Placement de Tunisie - Sicaf" (PLTU) stock.}
+    \label{fig:approximations_gamma}
+\end{figure}
+
 \end{document}
