@@ -7,7 +7,6 @@
 \usepackage{amsmath}
 \usepackage{stmaryrd}
 \usepackage[numbers,square]{natbib}
-\bibliographystyle{unsrtnat}\newcommand{\jump}{\newline\newline}
 % Document parameters
 % Document title 
 \title{Detecting Changes in Slope With an $L_0$ Penalty}
@@ -22,12 +21,12 @@ Sofiane EZZEHI \email{sofiane.ezzehi@eleves.enpc.fr} % student 2
 
 Changepoints detection is an important problem in time series analysis. It consists in finding the points in time where the statistical properties of the signal change. The problem can be modeled as a parametric approximation of the original signal to which a cost function is associated \cite{Truong_Oudre_Vayatis_2020}. Finding the approximation with minimal cost is generally a dynamic programming problem. In \cite{main_article}, the authors propose a piecewise continuous model for the signal, penalized by an $L_0$ penalty on the number of changepoints.
 
-Our contributions are the following :
-\begin{itemize}
-    \item Bastien L.C. implemented the algorithm in Python and optimized it to make it run in a reasonable time.
-    \item Sofiane E. debugged the algorithm, notably errors in the original paper, and ran the experiments.
-\end{itemize}
-We did not reuse the original code (in R and C++). We chose to test the algorithm on Tunisian stock market data, and we experimented with different values of the penalty parameter $\beta$ and the segment cost $h$.
+\paragraph*{Contributions}
+While an implementation of the algorithm was already available online in R and C++, we chose to implement it ourselves from scratch in Python.
+
+Both contributors spent a considerable amount of time on the implementation of the algorithm. While, Bastien L.C. implemented the algorithm in Python and heavily optimized it to make it run in a reasonable time, Sofiane E. thoroughly debugged the algorithm (notably finding and correcting errors in the original paper's computations), and ran the experiments. The report was jointly written by both contributors.
+
+ We chose to test the algorithm on Tunisian stock market data, and we experimented with different values of the penalty parameter $\beta$ and the segment cost $h$.
 
 \section{Method}
 
@@ -70,11 +69,11 @@ $f^t(\phi)$ can be expressed recursively :
 \begin{equation}
     f^t(\phi)=\min_{\phi',s} f^s(\phi')+\mathcal{C}(y[s+1:t],\phi',\phi)+h(t-s)+\beta
 \end{equation}
-To handle the cost of a specific segmentation let $f^t_{\boldsymbol{\tau}}(\phi)$ be the minimum cost for segmenting $y_1,\dots,y_t$ conditionally on the model taking the value $\phi$ at time $t$ and the changepoints being $\boldsymbol{\tau}=(\tau_0,\tau_1,\dots,\tau_k)$. $f^t_{\boldsymbol{\tau}}$ is a quadratic polynomial in $\phi$ and its coefficients can be expressed recursively.
+To handle the cost of a specific segmentation let $f^t_{\boldsymbol{\tau}}(\phi)$ be the minimum cost for segmenting $y_1,\dots,y_t$ conditionally on the model taking the value $\phi$ at time $t$ and the changepoints being $\boldsymbol{\tau}=(\tau_0,\tau_1,\dots,\tau_k)$. $f^t_{\boldsymbol{\tau}}$ is a quadratic polynomial in $\phi$ and its coefficients can be expressed recursively. The coefficients given in Appendix C of the supplementary material of \cite{main_article} are not correct. We provide the correct coefficients in the Appendix \ref{appendix:coefficients}.
 
 \subsection{Pruning}
 
-Given the exponential complexity of the dynamic programming algorithm ($\mathcal{O}(2^n)$ possible segmentations), the authors introduce two pruning techniques to reduce the complexity.
+Given the exponential complexity of the dynamic programming algorithm ($\mathcal{O}(2^n)$ possible segmentations), the authors introduce two pruning techniques to reduce it.
 
 \subsubsection{Functional pruning} Let $\mathcal{T}_t$ be the set of all possible changepoint vectors for segmenting $y_1,\dots,y_t$, and $\mathcal{T}_t^*=\left\{\boldsymbol{\tau}\in \mathcal{T}_t \:\big|\: \exists\phi\in\mathbb{R}, f^t(\phi)=f_{\boldsymbol{\tau}}^t(\phi)\right\}$ the set of changepoint vectors at time $t$ that are optimal for some $\phi$. The following result reduces the number of segmentations to consider at time $t+1$.
 
@@ -97,25 +96,25 @@ This theorem allows to further prune the set $\hat{\mathcal{T}}_t$.
 
 The algorithm consists in computing the coefficients of the polynomials $f^t_{\boldsymbol{\tau}}(\phi)$ iteratively, starting from $f^0(\phi)$. At each step, the set of possible segmentations is pruned using the two pruning techniques. The algorithm is detailed in appendix \ref{appendix:algorithms}.
 
-The main difficulty of this algorithm is that we need to store polynomial coefficients instead of cost values. We also have to be carful to store only the coefficients that will be needed in recursive calls ($f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}$) to avoid memory issues. Overall avoiding re-allocating memory at each step was a challenge to implement the algorithm efficiently.
+The main difficulty of this algorithm is that we need to store polynomial coefficients instead of cost values. We also have to be careful to store only the coefficients that will be needed in recursive calls ($f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}$) to avoid memory issues. Overall avoiding re-allocating memory at each step was a challenge to implement the algorithm efficiently.
 
 The authors provided relatively detailed pseudo-code for the algorithm, but we still found it difficult to implement. One difficulty was that the coefficients updates given in the paper were not correct, which took a lot of time to figure out.
 
 \section{Data}
 \subsection{Data description : Tunisian stock market}
 Financial data, and more specifically stock prices across time, are a good candidate to test the method. Indeed, stock prices, taken at a relatively low frequency (daily) are known to exhibit clear trends, while being noisy enough to make the detection of changepoints interesting. And since the method is designed to detect changepoints in a piecewise linear model, it is well suited for this kind of data.
-\jump
+
 We test the method on the stock prices of all the listed companies on the Bourse de Tunis, which is Tunisia stock exchange. The data was taken from Kagglee, and is available at \url{https://www.kaggle.com/datasets/amariaziz/tunisian-stock-market}. It contains the Open, High, Low and Close prices of 88 companies, as well as the volume of transactions. We only use the Close prices, which are the prices at the end of the trading day.
 \subsection{Data preprocessing}
 Since the data was partially collected by web scraping, it naturally requires some cleaning and preprocessing. We detail here the steps we took to clean the data.
 \paragraph*{Stocks with too few data points} We see on figure \ref{fig:histogram_size} that the number of data points per company is very variable. We remove the stocks that have less than $200$ data points, since they are not interesting for our analysis. We are left with $85$ companies.
-\paragraph*{Missing values and duplicates} Missing values are days where we have corrupted data for a given stock. We see in table \ref{tab:missing_values} that the data is relatively clean of missing values, with only $3$ companies having no more than a few percent of missing values. We see on figure \ref{fig:bar_duplicates} that each stock has between $1\%$ and $3\%$ of duplicates. We remove the missing values as well as the duplicates.
-\paragraph*{Missing days} Missing days are days where we have no data at all for a given stock. We see on figure \ref{fig:bar_missing_days} that the number of missing days is clearly the biggest issue with the data, with most stocks having more than $40\%$ of missing days. We deal with this issue by interpolating the missing days, using a linear interpolation between the last and next available data points. We note that this is not a perfect solution, since it assumes that the stock price evolves linearly between two days, which is never the case for stock prices. However, it is a simple solution that allows us to keep the data for all the stocks.
-\paragraph*{Data shrinkage by sub-sampling} Since our method is relatively slow for time series longer than a few thousand points, and since our available computational power is limited, we sub-sample the data to reduce its size. We sub-sample the data by only keeping at most $1000$ points per stock, by sampling uniformly on the time axis. We see on figure \ref{fig:subsample} that this sub-sampling very slightly affects the data.
+\paragraph*{Missing values and duplicates} Missing values are days where we have corrupted data for a given stock. We see in table \ref{tab:missing_values} that the data is relatively clean of missing values, with only $3$ companies having no more than a few percent of corrupted data. We see on figure \ref{fig:bar_duplicates} that each stock has between $1\%$ and $3\%$ of duplicates. We remove the missing values as well as the duplicates.
+\paragraph*{Missing days} Missing days are days where we have no data at all for a given stock. We see on figure \ref{fig:bar_missing_days} that the number of missing days is clearly the biggest issue with the data, with most stocks having more than $40\%$ of missing days. We deal with this issue by linearl interpolating the missing days between the last and next available data points. We note that this is not a perfect solution, since it assumes that the stock price evolves linearly between two days. However, it is a simple solution that allows us to keep the data for all the stocks.
+\paragraph*{Data shrinkage by sub-sampling} Since our method is relatively slow for time series longer than a few thousand points, and since our available computational power is limited, we uniformly sub-sample the data to reduce its size, only keeping at most $500$ points per stock. We see on figure \ref{fig:subsample} that this sub-sampling very slightly affects the shape of the signal.
 
 \section{Results}
-We present here a few experiments that we conducted on the $85$ Tunisian stocks we preprocessed. First, we zoom on a few stocks to see how the method behaves and we qualitatively compare it to a best-fitting piecewise constant mean model. Second, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. Third, we investigate the influence of the segment cost $h$ on the number of changepoints detected. Finally, we briefly discuss the computational complexity of the method.
-\jump
+We present here a few experiments that we conducted on the $85$ Tunisian stocks we preprocessed. First, we zoom on a particular stock to see how the method behaves and we qualitatively compare it to a best-fitting piecewise constant mean model. Second, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. Third, we investigate the influence of the segment cost $h$ on the number of changepoints detected.
+
 In all the experiments, we use a segment cost $h$ of the form $ h(s) = \gamma \log(s), $ where $\gamma$ is a parameter to fix and $s$ is the length of the segment. We also fix the parameter $\sigma$ depending on the stock, by using the very classical Median Absolute Deviation (MAD) estimator first introduced in \cite{hampel1974}.
 \subsection{Qualitative comparison with a piecewise constant mean model}
 We compare the method to a piecewise constant mean model, which is the simplest model that can be used to detect changepoints. We note that the nature of the data (stock prices) puts the piecewise constant mean model at a great disadvantage, since stock prices are known to exhibit piecewise linear trends. We only perform this comparison qualitatively.
@@ -131,18 +130,16 @@ We see on figure \ref{fig:comparison} that the CPOP method is able to detect the
 
 \subsection{Influence of the penalty parameter $\beta$}
 Next, we investigate the influence of the penalty parameter $\beta$ on the number of changepoints detected. We see on figure \ref{fig:cgpts_beta} that the number of changepoints is a decreasing function of $\beta$, which is natural since $\beta$ penalizes the number of changepoints. We visualize the approximations obtained for values of $\beta \in \{0.1, 1, 5, 10, 20\}$ and $\gamma = 1$, on figure \ref{fig:approximations_beta}.
-\jump
+
 In particular, on figure \ref{fig:approximations_beta}, we see that almost all the data points are being detected for $\beta=0.1$ which, again, is a very normal behaviour, since we get a very minimal mean-square error $\sum C$ as well as a very small cost for the segments $\sum h$ if we allow for a lot of changepoints.
-\jump
-Furthermore, we see that the number of changepoints detected is the same for $\beta = 10$ and $\beta = 20$. This is due to the fact that the segment cost $\sum h$, which penalizes the length of the segments, as well as the mean-square error $\sum C$, which penalizes the distance between the data and the approximation, are both dominant compared to the effect of penalization for $\beta$ values in this $[10,20]$ range.
+
+Furthermore, we see that the number of changepoints detected is the same for $\beta = 10$ and $\beta = 20$. This is due to the fact that the segment length cost $\sum h$, as well as the mean-square error $\sum C$ are both dominant compared to the effect of $\beta$, for values in this $[10,20]$ range.
 
 \subsection{Influence of the segment cost $h$}
 We used the same methodology to investigate the influence of the segment cost $h$ on the number of changepoints detected. We recall that the segment cost $h$, which penalizes the length of the segments, was chosen of the form,
-$$ h(s) = \gamma \log(s), $$ where $\gamma$ is a parameter.
-\jump
-We see on figure \ref{fig:approximations_gamma} the influence of $\gamma$ on the number of changepoints detected. An interesting phenomenon is that we could at first expect that, in order to reduce $h$, the algorithm would tend to split the largest segments into smaller segments, but we see that this is not the case. Indeed, since the segment cost is logarithmic, the algorithm tends to split the smallest segments into even smaller segments, which is why we see that the number of changepoints detected doesn't necessarily decrease when $\gamma$ increases. Furthermore, this explains why, as $\gamma$ increases, we see distinct parts of the signal with a denser number of changepoints.
+$$ h(s) = \gamma \log(s), $$ where $\gamma$ is the parameter we will vary in this experiment.
 
-\subsection{Computational complexity}
+We see on figure \ref{fig:approximations_gamma} the influence of $\gamma$ on the predicted approximation. An interesting phenomenon is that we could at first expect that, in order to reduce $h$, the algorithm would tend to split the largest segments into smaller segments, but we see that this is not the case. Indeed, since the segment cost is logarithmic, the algorithm tends to split the smallest segments into even smaller segments, which is why we see that the number of changepoints detected doesn't necessarily decrease when $\gamma$ increases. Furthermore, this explains why, as $\gamma$ increases, we see distinct parts of the signal with a denser number of changepoints.
 
 
 \bibliography{bibliography}
@@ -203,16 +200,17 @@ This algorithm is the main algorithm, it computes the coefficients of the polyno
         \State \textbf{Output:} $\argmin_{\tau\in \hat{\mathcal{T}}_n}[\min_\phi f^n_\tau(\phi)]$
     \end{algorithmic}
 \end{algorithm}
-
+\clearpage
 \subsection{Correction of the computed coefficients of the polynomials $f^t_{\boldsymbol{\tau}}(\phi)$}
+\label{appendix:coefficients}
 The authors provide a calculation of the coefficients of the polynomials $f^t_{\boldsymbol{\tau}}(\phi)$ in Appendix C of the supplementary material of \cite{main_article}. However, we found several mistakes in their calculations. We detail here the corrections we made.
-\jump
+
 The computation of the coefficients $A,\dots,F$ of $\mathcal{C}(y_{\tau_k+1:t},\phi',\phi)$ is correct. We therefore take,
 \begin{equation}
     \mathcal{C}(y_{\tau_k+1:t},\phi',\phi) = A\phi^2+B\phi'\phi + C\phi + D + E\phi'+F{\phi'}^2,
 \end{equation}
 with the coefficients $A,\dots,F$ given by the authors.
-\jump
+
 We have to solve the following minimization problem,
 \begin{equation}
     f_{\boldsymbol{\tau}}^t(\phi) = \min_{\phi'}\underbrace{\left(f^{\tau_k}_{\tau_1,\dots,\tau_{k-1}}(\phi')+\mathcal{C}(y_{\tau_k+1:t},\phi',\phi)+h(t-\tau_k)+\beta\right)}_{\vcentcolon = g_\phi(\phi')}.
