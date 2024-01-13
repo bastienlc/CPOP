@@ -83,7 +83,6 @@ def get_optimality_intervals(
         indices_from_store_to_remove: List[int] = []
         for index in temp_indices:
             if index == current_index:  # Skip the current tau
-                indices_from_store_to_remove.append(index)
                 x_taus.append(np.inf)
             else:
                 # Polynomial difference
